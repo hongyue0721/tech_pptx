@@ -5,7 +5,11 @@ from typing import Optional
 from courseware_core.errors import JobNotFound
 from courseware_core.models import ErrorResponse, Job, JobResultRef
 
-_TERMINAL_STATUSES = frozenset({"succeeded", "failed", "cancelled", "interrupted"})
+# blocked（资料不足，INSUFFICIENT_EVIDENCE）是"本次执行终止"的稳定终态：
+# 释放项目锁、不自动重放；教师补材料/收窄目标后重新受理新 job（api.md:59）。
+_TERMINAL_STATUSES = frozenset(
+    {"succeeded", "failed", "cancelled", "interrupted", "blocked"}
+)
 
 
 def _now_iso() -> str:

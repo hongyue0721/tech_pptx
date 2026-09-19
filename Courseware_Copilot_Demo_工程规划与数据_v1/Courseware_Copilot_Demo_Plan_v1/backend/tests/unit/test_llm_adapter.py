@@ -14,11 +14,13 @@ import pytest
 from courseware_core.errors import (
     BudgetExceeded,
     JobCancelled,
-    JobDeadlineExceeded,
     ModelAuthError,
-    ModelConfigError,
     ModelOutputInvalid,
+    ModelProtocolError,
+    ModelRateLimited,
+    ModelTimeout,
     ModelUnavailable,
+    ValidationFailed,
 )
 from courseware_core.llm.adapter import ChatCompletionsAdapter, TypedCompletion
 from courseware_core.llm.budget import CallBudget, JobContext
@@ -220,7 +222,7 @@ class TestJsonRepair:
 
     def test_unknown_schema_name_rejected(self):
         adapter, _, _ = make_adapter([])
-        with pytest.raises(ModelConfigError):
+        with pytest.raises(ValidationFailed):
             adapter.complete_json("plan_course", "NoSuchSchema", MESSAGES, make_context())
         assert len(adapter.transport.requests) == 0
 
@@ -237,14 +239,14 @@ class TestRetryMatrix:
         assert completion.attempts == 2
         assert sleeps == [0.0]
 
-    def test_429_twice_raises_model_unavailable(self):
+    def test_429_twice_raises_model_rate_limited(self):
         adapter, transport, _ = make_adapter(
             [
                 chat_response("", status=429, retry_after=0),
                 chat_response("", status=429, retry_after=0),
             ]
         )
-        with pytest.raises(ModelUnavailable):
+        with pytest.raises(ModelRateLimited):
             adapter.complete_json("plan_course", "PlanProposal", MESSAGES, make_context())
         assert len(transport.requests) == 2
 
@@ -276,7 +278,7 @@ class TestRetryMatrix:
 
     def test_400_fails_immediately_no_retry(self):
         adapter, transport, _ = make_adapter([chat_response("", status=400)])
-        with pytest.raises(ModelConfigError):
+        with pytest.raises(ModelProtocolError):
             adapter.complete_json("plan_course", "PlanProposal", MESSAGES, make_context())
         assert len(transport.requests) == 1
 
@@ -333,11 +335,11 @@ class TestRetryMatrix:
         completion = adapter.complete_json("plan_course", "PlanProposal", MESSAGES, make_context())
         assert completion.attempts == 2
 
-    def test_timeout_twice_raises_model_unavailable(self):
+    def test_timeout_twice_raises_model_timeout(self):
         adapter, transport, _ = make_adapter(
             [httpx.ReadTimeout("read timed out"), httpx.ReadTimeout("read timed out")]
         )
-        with pytest.raises(ModelUnavailable):
+        with pytest.raises(ModelTimeout):
             adapter.complete_json("plan_course", "PlanProposal", MESSAGES, make_context())
         assert len(transport.requests) == 2
 
@@ -361,7 +363,7 @@ class TestRetryMatrix:
                 chat_response("", status=429, retry_after=0),
             ]
         )
-        with pytest.raises(ModelUnavailable):
+        with pytest.raises(ModelRateLimited):
             adapter.complete_json("plan_course", "PlanProposal", MESSAGES, make_context())
         assert len(transport.requests) == 3
 
@@ -440,10 +442,10 @@ class TestCancellationAndDeadline:
             adapter.complete_json("plan_course", "PlanProposal", MESSAGES, context)
         assert len(transport.requests) == 1
 
-    def test_deadline_passed_raises_job_deadline_exceeded(self):
+    def test_deadline_passed_raises_model_timeout(self):
         adapter, transport, _ = make_adapter([chat_response(json.dumps(PLAN_PROPOSAL_JSON))])
         context = make_context(deadline=time.monotonic() - 1.0)
-        with pytest.raises(JobDeadlineExceeded):
+        with pytest.raises(ModelTimeout):
             adapter.complete_json("plan_course", "PlanProposal", MESSAGES, context)
         assert len(transport.requests) == 0
 

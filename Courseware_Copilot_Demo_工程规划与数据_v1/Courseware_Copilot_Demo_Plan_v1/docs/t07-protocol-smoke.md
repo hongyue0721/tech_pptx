@@ -12,7 +12,7 @@
 | P1 | 普通文本+中文UTF-8 | **PASS** | HTTP 200，2.12s，回复"探针好"，provider request_id 为 UUID |
 | P2 | 结构化JSON：`response_format={"type":"json_object"}` + `temperature=0` | **PASS** | HTTP 200，0.81s，content 可直接 json.loads 且结构符合 SemanticVerdicts；usage 完整返回（含 reasoning_tokens=32 扩展字段，解析器按白名单取三键不受影响） |
 | P3 | 错误体：无效Key | **PASS** | HTTP **401**（adapter 分类 ModelAuthError、不重试，与单测语义一致） |
-| P4 | 错误体：不存在模型 | **PASS** | HTTP **400**（该供应商对未知模型返回 400 而非 404；adapter 分类 ModelConfigError、不重试） |
+| P4 | 错误体：不存在模型 | **PASS** | HTTP **400**（该供应商对未知模型返回 400 而非 404；adapter 分类 MODEL_PROTOCOL_ERROR、不重试。注：本报告执行时该码名为 ModelConfigError，T08 轮按 api.md 表重构后更名） |
 | P5 | ChatCompletionsAdapter.complete_json 端到端真实调用 | **PASS** | attempts=1，typed 校验通过（checks_len=1），usage known（total 237），request_id 回填 |
 | P6 | 取消位真实环境拦截 | **PASS** | cancel_check=True → JobCancelled，零 HTTP 请求 |
 | P7 | 429 Retry-After 实际行为 | **NOT_TRIGGERED** | 未主动触发限流（无意义刷配额）；退避/封顶逻辑由 MockTransport 单测覆盖 |

@@ -76,11 +76,11 @@ class WorkerAlreadyRunning(DomainError):
         )
 
 
-class ModelConfigError(DomainError):
-    """401/403之外的环境与请求构造问题：模型不存在、参数不支持、schema名未知。"""
+class ModelProtocolError(DomainError):
+    """400/404/不支持参数/本地LLM配置缺失：确定性请求问题，重试无意义（api.md 502组）。"""
 
     def __init__(self, message: str, details: Optional[dict] = None):
-        super().__init__("MODEL_CONFIG_ERROR", message, details)
+        super().__init__("MODEL_PROTOCOL_ERROR", message, details)
 
 
 class ModelAuthError(DomainError):
@@ -90,10 +90,24 @@ class ModelAuthError(DomainError):
         super().__init__("MODEL_AUTH_ERROR", message, details)
 
 
-class ModelUnavailable(DomainError):
-    """429/5xx/网络/超时且重试配额耗尽：临时性不可用，可稍后重跑任务。"""
+class ModelRateLimited(DomainError):
+    """429且退避重试后仍限流（api.md 503组，受预算限制重试）。"""
 
-    def __init__(self, message: str, details: Optional[dict] = None):
+    def __init__(self, message: str = "model rate limited", details: Optional[dict] = None):
+        super().__init__("MODEL_RATE_LIMIT", message, details)
+
+
+class ModelTimeout(DomainError):
+    """读/连超时重试耗尽，或任务deadline超过（api.md 503组）。"""
+
+    def __init__(self, message: str = "model call timed out", details: Optional[dict] = None):
+        super().__init__("MODEL_TIMEOUT", message, details)
+
+
+class ModelUnavailable(DomainError):
+    """5xx/连接失败且退避重试耗尽：供应商临时故障，可稍后重跑任务。"""
+
+    def __init__(self, message: str = "model temporarily unavailable", details: Optional[dict] = None):
         super().__init__("MODEL_UNAVAILABLE", message, details)
 
 
@@ -115,13 +129,16 @@ class JobCancelled(DomainError):
     """取消位已置：停止后续步骤。供应商已接收的推理可能仍计费。"""
 
     def __init__(self, details: Optional[dict] = None):
-        super().__init__("JOB_CANCELLED", "job was cancelled", details)
+        super().__init__("CANCELLED", "job was cancelled", details)
 
 
-class JobDeadlineExceeded(DomainError):
-    """任务总预算时间已过：停止后续模型调用。"""
-
+class PlanNotFound(DomainError):
     def __init__(self, details: Optional[dict] = None):
-        super().__init__(
-            "JOB_DEADLINE_EXCEEDED", "job deadline exceeded", details
-        )
+        super().__init__("PLAN_NOT_FOUND", "lesson plan not found", details)
+
+
+class InsufficientEvidence(DomainError):
+    """资料不足：job置blocked（非failed），保持旧版本、补材料或收窄目标（api.md:59）。"""
+
+    def __init__(self, message: str = "insufficient evidence in materials", details: Optional[dict] = None):
+        super().__init__("INSUFFICIENT_EVIDENCE", message, details)

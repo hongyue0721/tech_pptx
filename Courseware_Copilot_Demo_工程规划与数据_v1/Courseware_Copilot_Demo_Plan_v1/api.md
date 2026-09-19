@@ -71,7 +71,7 @@ PreviewManifest标 `source_type=pptd_render|pptx_render|outline`。outline只是
 | code | HTTP | 可重试/行为 |
 |---|---:|---|
 | UNAUTHORIZED | 401 | 重新验证，不重发模型 |
-| PROJECT_NOT_FOUND / DECK_NOT_FOUND / ARTIFACT_NOT_FOUND | 404 | 检查ID |
+| PROJECT_NOT_FOUND / DECK_NOT_FOUND / ARTIFACT_NOT_FOUND / PLAN_NOT_FOUND | 404 | 检查ID |
 | PAYLOAD_TOO_LARGE / PAGE_LIMIT_EXCEEDED | 413 | 缩减资料 |
 | UNSUPPORTED_FILE / PDF_ENCRYPTED / PDF_TEXT_UNAVAILABLE | 422 | 换可解析资料 |
 | VALIDATION_ERROR / EDIT_UNSUPPORTED | 422 | 修改请求 |
@@ -79,6 +79,8 @@ PreviewManifest标 `source_type=pptd_render|pptx_render|outline`。outline只是
 | INSUFFICIENT_EVIDENCE / EVIDENCE_CONFLICT / EVIDENCE_INVALID | 422或job.blocked | 保持旧版本、补材料/收窄目标 |
 | MODEL_AUTH_ERROR / MODEL_PROTOCOL_ERROR | 502或job.failed | 修配置，不无限重试 |
 | MODEL_RATE_LIMIT / MODEL_TIMEOUT | 503或job.failed | 受预算限制重试 |
+| MODEL_UNAVAILABLE | 503或job.failed | 供应商临时故障（5xx/连接失败重试耗尽），稍后重跑 |
+| MODEL_OUTPUT_INVALID | 502或job.failed | 一次格式修复后仍不合Schema，重跑或换模型 |
 | BUDGET_EXCEEDED | 422或job.failed | 用户决定是否增加预算 |
 | EXPORT_FAILED / PREVIEW_FAILED | job.failed | 保留DeckVersion，只重试该派生步骤 |
 | JOB_INTERRUPTED / CANCELLED | job终态 | 明确中断，不伪报成功 |

@@ -6,7 +6,12 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable, Optional
 
-from courseware_core.errors import DomainError, WorkerAlreadyRunning
+from courseware_core.errors import (
+    DomainError,
+    InsufficientEvidence,
+    JobCancelled,
+    WorkerAlreadyRunning,
+)
 from courseware_core.models import ErrorDetail, ErrorResponse, Job, JobResultRef
 from courseware_core.storage.database import connect
 from courseware_core.storage.job_repository import JobRepository
@@ -14,17 +19,15 @@ from courseware_core.storage.job_repository import JobRepository
 JobHandler = Callable[[Job], Optional[JobResultRef]]
 
 
-class JobCancelled(Exception):
-    """handler 协作式取消：worker 捕获后把 job 置为 cancelled。"""
-
-
-def _error_response(code: str, message: str) -> ErrorResponse:
+def _error_response(
+    code: str, message: str, details: Optional[dict] = None
+) -> ErrorResponse:
     return ErrorResponse(
         error=ErrorDetail(
             code=code,
             message=message[:2000],
             request_id=f"worker_{secrets.token_hex(8)}",
-            details={},
+            details=details or {},
         )
     )
 
@@ -122,9 +125,16 @@ class JobWorker:
             result_ref = handler(job)
         except JobCancelled:
             repo.finalize(job.id, "cancelled")
+        except InsufficientEvidence as exc:
+            # 资料不足=blocked+INSUFFICIENT_EVIDENCE，与模型/网络错误的failed严格区分（api.md:59）。
+            repo.finalize(
+                job.id,
+                "blocked",
+                error=_error_response(exc.code, exc.message, exc.details),
+            )
         except DomainError as exc:
             repo.finalize(
-                job.id, "failed", error=_error_response(exc.code, exc.message)
+                job.id, "failed", error=_error_response(exc.code, exc.message, exc.details)
             )
         except Exception:
             repo.finalize(

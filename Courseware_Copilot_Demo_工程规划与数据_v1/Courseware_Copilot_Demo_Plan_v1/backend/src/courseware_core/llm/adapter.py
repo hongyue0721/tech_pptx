@@ -3,11 +3,13 @@
 只负责协议/格式/有限重试，不修改业务状态（docs/18）。领域服务定义
 plan_course/generate_content/plan_edit/verify_claims，不在UI中散落HTTP调用。
 
-重试矩阵（docs/06）：
+重试矩阵（docs/06，错误码对齐 api.md §错误码表）：
 - 429/临时5xx/网络连接失败/超时：至多一次退避重试，尊重Retry-After上限；
   网络重试配额在整个complete_json调用内共享，不得多层重试指数放大。
-- 401/403：ModelAuthError；400/404/不支持参数：ModelConfigError；均不重试。
-- JSON不合法或schema校验失败：一次带校验错误的修复，再失败则ModelOutputInvalid。
+  耗尽后按类型归码：429→MODEL_RATE_LIMIT、超时→MODEL_TIMEOUT、
+  5xx/连接错误→MODEL_UNAVAILABLE。
+- 401/403→MODEL_AUTH_ERROR；400/404/不支持参数/本地配置缺失→MODEL_PROTOCOL_ERROR；均不重试。
+- JSON不合法或schema校验失败：一次带校验错误的修复，再失败则MODEL_OUTPUT_INVALID。
 
 预算按实际HTTP请求次数扣减（含重试与修复请求），耗尽抛BudgetExceeded。
 """
@@ -23,11 +25,13 @@ from courseware_core.errors import (
     BudgetExceeded,
     DomainError,
     JobCancelled,
-    JobDeadlineExceeded,
     ModelAuthError,
-    ModelConfigError,
     ModelOutputInvalid,
+    ModelProtocolError,
+    ModelRateLimited,
+    ModelTimeout,
     ModelUnavailable,
+    ValidationFailed,
 )
 from courseware_core.models import PlanProposal, SemanticVerdicts
 
@@ -144,7 +148,7 @@ class ChatCompletionsAdapter:
     ) -> TypedCompletion:
         model = OUTPUT_SCHEMAS.get(schema_name)
         if model is None:
-            raise ModelConfigError(
+            raise ValidationFailed(
                 f"unknown output schema {schema_name!r}",
                 {"known": sorted(OUTPUT_SCHEMAS)},
             )
@@ -163,9 +167,19 @@ class ChatCompletionsAdapter:
                     network_retry_used = True
 
                 if outcome.error is not None:
+                    # 超时与连接失败分型（api.md 503组粒度）；均为重试耗尽后。
+                    if isinstance(outcome.error, httpx.TimeoutException):
+                        raise ModelTimeout(
+                            "model call timed out after retry",
+                            {"stage": stage, "attempts": attempts},
+                        )
                     raise ModelUnavailable(
-                        "temporary failure persisted after retry",
+                        "connection failure persisted after retry",
                         {"stage": stage, "attempts": attempts},
+                    )
+                if outcome.status == 429:
+                    raise ModelRateLimited(
+                        details={"stage": stage, "attempts": attempts, "status": 429}
                     )
                 if outcome.status in TEMPORARY_STATUS_CODES:
                     raise ModelUnavailable(
@@ -178,7 +192,7 @@ class ChatCompletionsAdapter:
                         {"status": outcome.status},
                     )
                 if outcome.status != 200:
-                    raise ModelConfigError(
+                    raise ModelProtocolError(
                         f"model endpoint rejected request ({outcome.status})",
                         {"status": outcome.status},
                     )
@@ -296,4 +310,5 @@ class ChatCompletionsAdapter:
             return BudgetExceeded({"stage": stage, "max_calls": exc.max_calls, "used": exc.used})
         if isinstance(exc, CancelledError):
             return JobCancelled({"stage": stage, "attempts": attempts})
-        return JobDeadlineExceeded({"stage": stage, "attempts": attempts})
+        # deadline 是时间预算超限，归入超时组（api.md MODEL_TIMEOUT→503）。
+        return ModelTimeout("job deadline exceeded", {"stage": stage, "attempts": attempts})
