@@ -74,3 +74,54 @@ class WorkerAlreadyRunning(DomainError):
         super().__init__(
             "WORKER_ALREADY_RUNNING", "another job worker holds the lock", details
         )
+
+
+class ModelConfigError(DomainError):
+    """401/403之外的环境与请求构造问题：模型不存在、参数不支持、schema名未知。"""
+
+    def __init__(self, message: str, details: Optional[dict] = None):
+        super().__init__("MODEL_CONFIG_ERROR", message, details)
+
+
+class ModelAuthError(DomainError):
+    """401/403：凭据或授权问题，重试无意义，须修正配置。"""
+
+    def __init__(self, message: str, details: Optional[dict] = None):
+        super().__init__("MODEL_AUTH_ERROR", message, details)
+
+
+class ModelUnavailable(DomainError):
+    """429/5xx/网络/超时且重试配额耗尽：临时性不可用，可稍后重跑任务。"""
+
+    def __init__(self, message: str, details: Optional[dict] = None):
+        super().__init__("MODEL_UNAVAILABLE", message, details)
+
+
+class ModelOutputInvalid(DomainError):
+    """JSON解析/schema校验失败且修复机会已用尽。"""
+
+    def __init__(self, message: str, details: Optional[dict] = None):
+        super().__init__("MODEL_OUTPUT_INVALID", message, details)
+
+
+class BudgetExceeded(DomainError):
+    """请求次数预算耗尽：不按剩余进度自动增加费用。"""
+
+    def __init__(self, details: Optional[dict] = None):
+        super().__init__("BUDGET_EXCEEDED", "model call budget exhausted", details)
+
+
+class JobCancelled(DomainError):
+    """取消位已置：停止后续步骤。供应商已接收的推理可能仍计费。"""
+
+    def __init__(self, details: Optional[dict] = None):
+        super().__init__("JOB_CANCELLED", "job was cancelled", details)
+
+
+class JobDeadlineExceeded(DomainError):
+    """任务总预算时间已过：停止后续模型调用。"""
+
+    def __init__(self, details: Optional[dict] = None):
+        super().__init__(
+            "JOB_DEADLINE_EXCEEDED", "job deadline exceeded", details
+        )
