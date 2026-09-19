@@ -99,6 +99,60 @@ CREATE INDEX IF NOT EXISTS idx_artifacts_project_version ON artifacts(project_id
 """
 
 
+# T05：材料/页/切块。SQLite 不存大文件内容（docs/04 §47），file_path 指向受控目录原子落盘原件。
+_MATERIALS_DDL = """
+CREATE TABLE IF NOT EXISTS materials (
+    id TEXT PRIMARY KEY,
+    project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+    original_name TEXT NOT NULL,
+    sha256 TEXT NOT NULL CHECK (length(sha256) = 64),
+    status TEXT NOT NULL CHECK (status IN ('queued','parsing','ready','failed')),
+    pdf_pages INTEGER CHECK (pdf_pages IS NULL OR pdf_pages >= 1),
+    usable_pages INTEGER CHECK (usable_pages IS NULL OR usable_pages >= 0),
+    corpus_revision INTEGER,
+    warnings_json TEXT NOT NULL DEFAULT '[]',
+    error_code TEXT,
+    file_path TEXT NOT NULL,
+    file_size INTEGER NOT NULL CHECK (file_size >= 0),
+    job_id TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_materials_project ON materials(project_id);
+CREATE INDEX IF NOT EXISTS idx_materials_project_sha ON materials(project_id, sha256);
+"""
+
+_PAGES_DDL = """
+CREATE TABLE IF NOT EXISTS pages (
+    document_id TEXT NOT NULL REFERENCES materials(id) ON DELETE CASCADE,
+    pdf_page INTEGER NOT NULL CHECK (pdf_page >= 1),
+    printed_page_label TEXT,
+    text TEXT NOT NULL,
+    text_sha256 TEXT NOT NULL CHECK (length(text_sha256) = 64),
+    extractor_version TEXT NOT NULL,
+    warnings_json TEXT NOT NULL DEFAULT '[]',
+    PRIMARY KEY (document_id, pdf_page)
+);
+"""
+
+_CHUNKS_DDL = """
+CREATE TABLE IF NOT EXISTS chunks (
+    chunk_id TEXT PRIMARY KEY,
+    project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+    document_id TEXT NOT NULL REFERENCES materials(id) ON DELETE CASCADE,
+    corpus_revision INTEGER NOT NULL CHECK (corpus_revision >= 0),
+    pdf_page INTEGER NOT NULL CHECK (pdf_page >= 1),
+    page_start INTEGER NOT NULL CHECK (page_start >= 0),
+    page_end INTEGER NOT NULL CHECK (page_end >= 1),
+    text TEXT NOT NULL,
+    text_sha256 TEXT NOT NULL CHECK (length(text_sha256) = 64),
+    extractor_version TEXT NOT NULL,
+    tokenizer_version TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_chunks_project_rev ON chunks(project_id, corpus_revision);
+"""
+
+
 def connect(db_path: Path) -> sqlite3.Connection:
     conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row
@@ -117,6 +171,9 @@ def init_db(conn: sqlite3.Connection) -> None:
             + _IDEMPOTENCY_DDL
             + _DECK_VERSIONS_DDL
             + _ARTIFACTS_DDL
+            + _MATERIALS_DDL
+            + _PAGES_DDL
+            + _CHUNKS_DDL
         )
         row = conn.execute("SELECT version FROM schema_meta").fetchone()
         if row is None:

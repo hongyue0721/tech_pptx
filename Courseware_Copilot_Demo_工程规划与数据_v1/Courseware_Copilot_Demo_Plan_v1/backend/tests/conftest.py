@@ -13,6 +13,12 @@ def conn(tmp_path):
     c.close()
 
 
+VALID_COURSE_JSON = (
+    '{"topic": "STM32 中断", "audience": "大二",'
+    ' "duration_minutes": 45, "goals": ["理解 NVIC"], "target_slides": 8}'
+)
+
+
 @pytest.fixture()
 def insert_project(conn):
     def _insert(
@@ -29,7 +35,7 @@ def insert_project(conn):
                 " created_at, updated_at) VALUES (?, ?, ?, ?, ?, 1, ?, ?)",
                 (
                     project_id,
-                    "{}",
+                    VALID_COURSE_JSON,
                     current_version,
                     corpus_revision,
                     active_job_id,

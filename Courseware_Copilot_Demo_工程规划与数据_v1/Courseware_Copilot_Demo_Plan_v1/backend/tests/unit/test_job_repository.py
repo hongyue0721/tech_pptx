@@ -56,8 +56,12 @@ def test_get_missing_returns_none(repo):
     assert repo.get("nope") is None
 
 
-def test_claim_next_transitions_queued_to_running(repo):
+def test_claim_next_transitions_queued_to_running(repo, conn):
     repo.create(make_job())
+    with conn:
+        conn.execute(
+            "UPDATE projects SET active_job_id = 'job_1' WHERE id = 'prj_a'"
+        )
     claimed = repo.claim_next("w1")
     assert claimed is not None
     assert claimed.id == "job_1"
@@ -66,11 +70,28 @@ def test_claim_next_transitions_queued_to_running(repo):
     assert repo.claim_next("w1") is None
 
 
-def test_claim_respects_fifo_order(repo):
+def test_claim_respects_fifo_order(repo, conn):
     repo.create(make_job("job_b", created_at="2026-01-01T00:00:00+00:00"))
     repo.create(make_job("job_a", created_at="2026-06-01T00:00:00+00:00"))
+    with conn:
+        conn.execute(
+            "UPDATE projects SET active_job_id = 'job_b' WHERE id = 'prj_a'"
+        )
     claimed = repo.claim_next("w1")
     assert claimed.id == "job_b"
+
+
+def test_claim_write_job_requires_project_lock(repo):
+    """N8：写 kind 未持有项目锁时不得领取（不变式破坏时显式排队而非并发执行）。"""
+    repo.create(make_job("job_nolock", kind="generate"))
+    assert repo.claim_next("w1") is None
+
+
+def test_claim_export_job_without_lock_allowed(repo):
+    """export 是只读快照，可排队、不占写锁（docs/07 §3）。"""
+    repo.create(make_job("job_exp", kind="export"))
+    claimed = repo.claim_next("w1")
+    assert claimed is not None and claimed.id == "job_exp"
 
 
 def test_request_cancel_queued_becomes_cancelled(repo):
@@ -259,6 +280,10 @@ def test_concurrent_claim_next_single_winner(tmp_path):
             (T0, T0),
         )
     JobRepository(seed).create(make_job("job_race", created_at="2026-01-01T00:00:00+00:00"))
+    with seed:
+        seed.execute(
+            "UPDATE projects SET active_job_id = 'job_race' WHERE id = 'prj_a'"
+        )
     seed.close()
 
     barrier = threading.Barrier(2)

@@ -50,15 +50,22 @@ class JobRepository:
         return self._row_to_job(row) if row is not None else None
 
     def claim_next(self, worker_id: str, now: Optional[str] = None) -> Optional[Job]:
-        """单语句原子领取 queued→running；并发下只有一个 worker 能拿到。"""
+        """单语句原子领取 queued→running；并发下只有一个 worker 能拿到。
+
+        写 kind（parse/plan/generate/edit）必须已持有项目锁才可领取（review N8），
+        防止"占锁+建 job"不变式被破坏时同项目并发两个写任务；export 是只读快照可排队。
+        """
         now = now or _now_iso()
         with self._conn:
             row = self._conn.execute(
                 "UPDATE jobs SET status = 'running', worker_id = ?, claimed_at = ?,"
                 " updated_at = ?"
                 " WHERE id = ("
-                "   SELECT id FROM jobs WHERE status = 'queued'"
-                "   ORDER BY created_at, id LIMIT 1)"
+                "   SELECT j.id FROM jobs j"
+                "   JOIN projects p ON p.id = j.project_id"
+                "   WHERE j.status = 'queued'"
+                "     AND (j.kind = 'export' OR p.active_job_id = j.id)"
+                "   ORDER BY j.created_at, j.id LIMIT 1)"
                 " RETURNING id",
                 (worker_id, now, now),
             ).fetchone()

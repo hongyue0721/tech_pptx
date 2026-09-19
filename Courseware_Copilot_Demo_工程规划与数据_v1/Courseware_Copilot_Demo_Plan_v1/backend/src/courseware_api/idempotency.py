@@ -55,12 +55,12 @@ def execute_idempotent(
     project_ref: str,
     body: Optional[ContractModel],
     produce: Callable[[], tuple[int, Optional[dict]]],
+    request_hash_override: Optional[str] = None,
 ) -> Response:
     key = require_idempotency_key(request)
     scope = build_scope(request, route, project_ref)
-    result: CachedResponse = service.execute(
-        scope, key, compute_request_hash(route, body), produce
-    )
+    request_hash = request_hash_override or compute_request_hash(route, body)
+    result: CachedResponse = service.execute(scope, key, request_hash, produce)
     if result.body is None:
         return Response(status_code=result.status)
     return JSONResponse(status_code=result.status, content=result.body)

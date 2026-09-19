@@ -34,6 +34,11 @@ def seed_job(db_path: Path, job_id: str, status: str = "queued", project_id: str
                 " created_at, updated_at) VALUES (?, '{}', 0, 1, NULL, 1, ?, ?)",
                 (project_id, T0, T0),
             )
+            if status == "queued":
+                conn.execute(
+                    "UPDATE projects SET active_job_id = ? WHERE id = ?",
+                    (job_id, project_id),
+                )
         JobRepository(conn).create(
             Job(
                 id=job_id,
@@ -116,6 +121,14 @@ def test_worker_marks_handler_domain_error_as_failed(db_path):
         assert wait_until(lambda: job_status(db_path, "job_f") == "failed")
     finally:
         worker.stop()
+    conn = connect(db_path)
+    try:
+        lock = conn.execute(
+            "SELECT active_job_id FROM projects WHERE id = 'prj_w'"
+        ).fetchone()[0]
+        assert lock is None  # N13：failed 终态必须释放自身项目锁
+    finally:
+        conn.close()
 
 
 def test_worker_marks_unexpected_exception_as_failed(db_path):
