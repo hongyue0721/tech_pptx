@@ -1,36 +1,32 @@
 from fastapi import APIRouter, Depends, Request, Response
 
-from courseware_api.dependencies import get_project_service
-from courseware_core.errors import ValidationFailed
+from courseware_api.dependencies import (
+    get_idempotency_service,
+    get_project_service,
+)
+from courseware_api.idempotency import execute_idempotent
 from courseware_core.models import (
     ConfirmDeleteRequest,
     CreateProjectRequest,
     Project,
 )
+from courseware_core.services.idempotency_service import IdempotencyService
 from courseware_core.services.project_service import ProjectService
 
 router = APIRouter()
 
-IDEMPOTENCY_KEY_HEADER = "Idempotency-Key"
-
-
-def require_idempotency_key(request: Request) -> str:
-    value = request.headers.get(IDEMPOTENCY_KEY_HEADER)
-    if value is None or not (1 <= len(value) <= 128):
-        raise ValidationFailed(
-            "mutating operations require Idempotency-Key (1-128 chars)",
-            {"header": IDEMPOTENCY_KEY_HEADER},
-        )
-    return value
-
 
 @router.post("/projects", status_code=201, response_model=Project)
 def create_project(
+    request: Request,
     body: CreateProjectRequest,
     service: ProjectService = Depends(get_project_service),
-    _idem: str = Depends(require_idempotency_key),
-) -> Project:
-    return service.create_project(body)
+    idem: IdempotencyService = Depends(get_idempotency_service),
+) -> Response:
+    def produce() -> tuple[int, dict]:
+        return 201, service.create_project(body).model_dump(mode="json")
+
+    return execute_idempotent(request, idem, "POST /projects", "-", body, produce)
 
 
 @router.get("/projects/{project_id}", response_model=Project)
@@ -43,10 +39,16 @@ def get_project(
 
 @router.delete("/projects/{project_id}", status_code=204)
 def delete_project(
+    request: Request,
     project_id: str,
     body: ConfirmDeleteRequest,
     service: ProjectService = Depends(get_project_service),
-    _idem: str = Depends(require_idempotency_key),
+    idem: IdempotencyService = Depends(get_idempotency_service),
 ) -> Response:
-    service.delete_project(project_id, body)
-    return Response(status_code=204)
+    def produce() -> tuple[int, None]:
+        service.delete_project(project_id, body)
+        return 204, None
+
+    return execute_idempotent(
+        request, idem, "DELETE /projects/{project_id}", project_id, body, produce
+    )

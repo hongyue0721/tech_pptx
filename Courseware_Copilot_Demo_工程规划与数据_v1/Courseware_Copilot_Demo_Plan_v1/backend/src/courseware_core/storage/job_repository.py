@@ -1,0 +1,196 @@
+import sqlite3
+from datetime import datetime, timezone
+from typing import Optional
+
+from courseware_core.errors import JobNotFound
+from courseware_core.models import ErrorResponse, Job, JobResultRef
+
+_TERMINAL_STATUSES = frozenset({"succeeded", "failed", "cancelled", "interrupted"})
+
+
+def _now_iso() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
+class JobRepository:
+    """jobs 表持久化。领取用单语句 CAS（RETURNING），终态与项目锁释放在同一事务。"""
+
+    def __init__(self, conn: sqlite3.Connection):
+        self._conn = conn
+
+    def create(self, job: Job, request_id: Optional[str] = None) -> None:
+        with self._conn:
+            self._conn.execute(
+                "INSERT INTO jobs (id, project_id, kind, status, stage, cancel_requested,"
+                " base_version, corpus_revision, result_ref, error, llm_calls, request_id,"
+                " created_at, updated_at)"
+                " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (
+                    job.id,
+                    job.project_id,
+                    job.kind,
+                    job.status,
+                    job.stage,
+                    int(job.cancel_requested),
+                    job.base_version,
+                    job.corpus_revision,
+                    job.result_ref.model_dump_json() if job.result_ref else None,
+                    job.error.model_dump_json() if job.error else None,
+                    job.llm_calls,
+                    request_id,
+                    job.created_at.isoformat(),
+                    job.updated_at.isoformat(),
+                ),
+            )
+
+    def get(self, job_id: str) -> Optional[Job]:
+        row = self._conn.execute(
+            "SELECT * FROM jobs WHERE id = ?", (job_id,)
+        ).fetchone()
+        return self._row_to_job(row) if row is not None else None
+
+    def claim_next(self, worker_id: str, now: Optional[str] = None) -> Optional[Job]:
+        """单语句原子领取 queued→running；并发下只有一个 worker 能拿到。"""
+        now = now or _now_iso()
+        with self._conn:
+            row = self._conn.execute(
+                "UPDATE jobs SET status = 'running', worker_id = ?, claimed_at = ?,"
+                " updated_at = ?"
+                " WHERE id = ("
+                "   SELECT id FROM jobs WHERE status = 'queued'"
+                "   ORDER BY created_at, id LIMIT 1)"
+                " RETURNING id",
+                (worker_id, now, now),
+            ).fetchone()
+        if row is None:
+            return None
+        return self.get(row["id"])
+
+    def mark_interrupted_on_startup(self, now: Optional[str] = None) -> list[str]:
+        """上一个进程遗留的 running job 标 interrupted（不重放），并释放其项目锁。"""
+        now = now or _now_iso()
+        with self._conn:
+            ids = [
+                r["id"]
+                for r in self._conn.execute(
+                    "SELECT id FROM jobs WHERE status = 'running'"
+                ).fetchall()
+            ]
+            if ids:
+                self._conn.execute(
+                    "UPDATE jobs SET status = 'interrupted', updated_at = ?"
+                    " WHERE status = 'running'",
+                    (now,),
+                )
+                for job_id in ids:
+                    self._conn.execute(
+                        "UPDATE projects SET active_job_id = NULL, updated_at = ?"
+                        " WHERE active_job_id = ?",
+                        (now, job_id),
+                    )
+        return ids
+
+    def request_cancel(self, job_id: str, now: Optional[str] = None) -> Optional[Job]:
+        """queued→cancelled（释放锁）；running→置 cancel_requested 由 worker 边界终止；终态原样返回。
+
+        全 CAS：读状态只用于最终返回，状态迁移由 UPDATE 守卫决定，
+        避免"读到 queued 后被 worker 领取、再被取消路径强改 cancelled"的 TOCTOU（review B1）。
+        """
+        now = now or _now_iso()
+        with self._conn:
+            cur = self._conn.execute(
+                "UPDATE jobs SET status = 'cancelled', stage = 'finished',"
+                " cancel_requested = 1, updated_at = ? WHERE id = ? AND status = 'queued'",
+                (now, job_id),
+            )
+            if cur.rowcount > 0:
+                self._conn.execute(
+                    "UPDATE projects SET active_job_id = NULL, updated_at = ?"
+                    " WHERE active_job_id = ?",
+                    (now, job_id),
+                )
+            else:
+                self._conn.execute(
+                    "UPDATE jobs SET cancel_requested = 1, updated_at = ?"
+                    " WHERE id = ? AND status = 'running'",
+                    (now, job_id),
+                )
+        return self.get(job_id)
+
+    def finalize(
+        self,
+        job_id: str,
+        status: str,
+        *,
+        stage: str = "finished",
+        result_ref: Optional[JobResultRef] = None,
+        error: Optional[ErrorResponse] = None,
+        now: Optional[str] = None,
+    ) -> Job:
+        """写终态并释放该 job 持有的项目锁（同一事务）。
+
+        带 running 守卫（review N3）：终态不可被二次 finalize 覆盖，重复调用幂等返回当前行。
+        """
+        if status not in _TERMINAL_STATUSES:
+            raise ValueError(f"finalize requires terminal status, got {status!r}")
+        now = now or _now_iso()
+        with self._conn:
+            cur = self._conn.execute(
+                "UPDATE jobs SET status = ?, stage = ?, result_ref = ?, error = ?,"
+                " updated_at = ? WHERE id = ? AND status = 'running'",
+                (
+                    status,
+                    stage,
+                    result_ref.model_dump_json() if result_ref else None,
+                    error.model_dump_json() if error else None,
+                    now,
+                    job_id,
+                ),
+            )
+            if cur.rowcount > 0:
+                self._conn.execute(
+                    "UPDATE projects SET active_job_id = NULL, updated_at = ?"
+                    " WHERE active_job_id = ?",
+                    (now, job_id),
+                )
+        result = self.get(job_id)
+        if result is None:
+            raise JobNotFound({"job_id": job_id})
+        return result
+
+    def set_stage(self, job_id: str, stage: str, now: Optional[str] = None) -> Job:
+        now = now or _now_iso()
+        with self._conn:
+            cur = self._conn.execute(
+                "UPDATE jobs SET stage = ?, updated_at = ? WHERE id = ?",
+                (stage, now, job_id),
+            )
+            if cur.rowcount == 0:
+                raise JobNotFound({"job_id": job_id})
+        result = self.get(job_id)
+        assert result is not None
+        return result
+
+    @staticmethod
+    def _row_to_job(row: sqlite3.Row) -> Job:
+        return Job(
+            id=row["id"],
+            project_id=row["project_id"],
+            kind=row["kind"],
+            status=row["status"],
+            stage=row["stage"],
+            cancel_requested=bool(row["cancel_requested"]),
+            base_version=row["base_version"],
+            corpus_revision=row["corpus_revision"],
+            result_ref=(
+                JobResultRef.model_validate_json(row["result_ref"])
+                if row["result_ref"]
+                else None
+            ),
+            error=(
+                ErrorResponse.model_validate_json(row["error"]) if row["error"] else None
+            ),
+            llm_calls=row["llm_calls"],
+            created_at=row["created_at"],
+            updated_at=row["updated_at"],
+        )
