@@ -152,6 +152,22 @@ CREATE TABLE IF NOT EXISTS chunks (
 CREATE INDEX IF NOT EXISTS idx_chunks_project_rev ON chunks(project_id, corpus_revision);
 """
 
+# T08：大纲（LessonPlan）。整对象随 plan_json 持久化（对齐 deck_versions 存法），
+# status/corpus_revision 冗余成列供查询与CAS；status 四态对齐 schema enum；
+# corpus_revision 绑定生成时的语料快照，前进即过期（docs/07 §21）。
+_PLANS_DDL = """
+CREATE TABLE IF NOT EXISTS plans (
+    id TEXT PRIMARY KEY,
+    project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+    corpus_revision INTEGER NOT NULL CHECK (corpus_revision >= 1),
+    status TEXT NOT NULL CHECK (status IN ('draft','needs_material','confirmed','stale')),
+    plan_json TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_plans_project_rev ON plans(project_id, corpus_revision);
+"""
+
 
 def connect(db_path: Path) -> sqlite3.Connection:
     conn = sqlite3.connect(db_path)
@@ -174,6 +190,7 @@ def init_db(conn: sqlite3.Connection) -> None:
             + _MATERIALS_DDL
             + _PAGES_DDL
             + _CHUNKS_DDL
+            + _PLANS_DDL
         )
         row = conn.execute("SELECT version FROM schema_meta").fetchone()
         if row is None:
