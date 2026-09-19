@@ -14,6 +14,7 @@ DOMAIN_ERROR_STATUS = {
     "DECK_NOT_FOUND": 404,
     "JOB_NOT_FOUND": 404,
     "ARTIFACT_NOT_FOUND": 404,
+    "PLAN_NOT_FOUND": 404,
     "PAYLOAD_TOO_LARGE": 413,
     "PAGE_LIMIT_EXCEEDED": 413,
     "EXTRACTION_LIMIT_EXCEEDED": 413,
@@ -23,12 +24,25 @@ DOMAIN_ERROR_STATUS = {
     "EVIDENCE_INVALID": 422,
     "VALIDATION_ERROR": 422,
     "EDIT_UNSUPPORTED": 422,
+    "INSUFFICIENT_EVIDENCE": 422,
+    "BUDGET_EXCEEDED": 422,
     "IDEMPOTENCY_CONFLICT": 409,
     "VERSION_CONFLICT": 409,
     "CORPUS_CHANGED": 409,
     "PROJECT_BUSY": 409,
     "PLAN_NOT_CONFIRMED": 409,
+    # JobCancelled 只在 worker 内的 LLM 调用路径抛出并由 worker 收口为 job 终态
+    # （api.md 定性"job终态"）；此映射是同步路径缺省兜底，当前无同步抛出点。
+    "CANCELLED": 409,
     "WORKER_ALREADY_RUNNING": 409,
+    # LLM 错误码组按 api.md §错误码表：502=修配置，503=临时不可用受预算重试。
+    # 异步执行中同类错误走 GET Job 的 error 字段体现，不经 HTTP 状态。
+    "MODEL_AUTH_ERROR": 502,
+    "MODEL_PROTOCOL_ERROR": 502,
+    "MODEL_OUTPUT_INVALID": 502,
+    "MODEL_RATE_LIMIT": 503,
+    "MODEL_TIMEOUT": 503,
+    "MODEL_UNAVAILABLE": 503,
     "ARTIFACT_INTEGRITY": 500,
 }
 

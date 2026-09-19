@@ -1,18 +1,41 @@
 """HTTP 层与后台 worker 的装配：handler 在 worker 线程内使用独立 SQLite 连接。"""
 
 from pathlib import Path
+from typing import Optional
 
-from courseware_core.errors import ValidationFailed
+from courseware_core.errors import ModelProtocolError, ValidationFailed
 from courseware_core.jobs.worker import JobHandler
+from courseware_core.llm.adapter import ChatCompletionsAdapter
+from courseware_core.llm.config import LLMConfig
 from courseware_core.models import Job, JobResultRef
 from courseware_core.services.material_service import MaterialService
+from courseware_core.services.plan_service import PlanService
 from courseware_core.storage.database import connect
 
 
 def build_worker_handlers(
-    db_path: Path, materials_root: Path
+    db_path: Path,
+    materials_root: Path,
+    plan_provider: Optional[object] = None,
 ) -> dict[str, JobHandler]:
-    """worker_handlers 注入 create_app；每个 handler 每次执行开短事务/独立连接。"""
+    """worker_handlers 注入 create_app；每个 handler 每次执行开短事务/独立连接。
+
+    plan_provider=None 时按 APP_LLM_* 环境变量惰性构造真实 adapter
+    （凭据只从环境读取，不落盘）；测试注入 Fake provider 走同一代码路径。
+    """
+    cached_provider = plan_provider
+
+    def resolve_provider():
+        nonlocal cached_provider
+        if cached_provider is None:
+            try:
+                config = LLMConfig.from_env()
+            except ValueError as exc:
+                raise ModelProtocolError(
+                    f"APP_LLM_* configuration missing or invalid: {exc}"
+                ) from exc
+            cached_provider = ChatCompletionsAdapter(config)
+        return cached_provider
 
     def parse_handler(job: Job) -> JobResultRef:
         conn = connect(db_path)
@@ -22,7 +45,15 @@ def build_worker_handlers(
         finally:
             conn.close()
 
-    return {"parse": parse_handler}
+    def plan_handler(job: Job) -> JobResultRef:
+        conn = connect(db_path)
+        try:
+            service = PlanService(conn, provider=resolve_provider())
+            return service.handle_plan(job)
+        finally:
+            conn.close()
+
+    return {"parse": parse_handler, "plan": plan_handler}
 
 
 def resolve_materials_root(db_path: Path, override: Path | None) -> Path:

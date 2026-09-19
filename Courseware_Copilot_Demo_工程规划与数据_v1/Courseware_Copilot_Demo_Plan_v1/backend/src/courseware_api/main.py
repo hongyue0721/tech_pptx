@@ -12,6 +12,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from courseware_api.api.routes_health import router as health_router
 from courseware_api.api.routes_jobs import router as jobs_router
 from courseware_api.api.routes_materials import router as materials_router
+from courseware_api.api.routes_plans import router as plans_router
 from courseware_api.api.routes_projects import router as projects_router
 from courseware_api.error_mapping import _error_payload, register_error_handlers
 from courseware_api.wiring import cleanup_orphan_material_files, resolve_materials_root
@@ -96,4 +97,5 @@ def create_app(
     app.include_router(projects_router, prefix=API_PREFIX)
     app.include_router(jobs_router, prefix=API_PREFIX)
     app.include_router(materials_router, prefix=API_PREFIX)
+    app.include_router(plans_router, prefix=API_PREFIX)
     return app
