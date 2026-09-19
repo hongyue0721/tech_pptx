@@ -1,0 +1,15 @@
+{
+  "course": {
+    "topic": "STM32中断基础与优先级判断",
+    "audience": "大学二年级电子信息专业，已学习C语言基础",
+    "duration_minutes": 45,
+    "goals": [
+      "区分挂起和活动状态",
+      "正确理解优先级数值与紧迫性",
+      "区分抢占字段和子字段的作用",
+      "通过明确条件的案例说明判断过程"
+    ],
+    "target_slides": 8
+  },
+  "consent_to_cloud_processing": true
+}

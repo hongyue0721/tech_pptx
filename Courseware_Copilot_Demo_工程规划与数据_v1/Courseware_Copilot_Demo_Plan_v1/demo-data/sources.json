@@ -1,0 +1,17 @@
+{
+  "D01": {
+    "title": "ST PM0214 Rev10",
+    "url": "https://www.st.com/resource/en/programming_manual/pm0214-stm32-cortexm4-mcus-and-mpus-programming-manual-stmicroelectronics.pdf",
+    "sections": "2.3.5—2.3.7；演示技术范围，未复制整本手册"
+  },
+  "D02": {
+    "title": "Arm CMSIS-Core NVIC",
+    "url": "https://arm-software.github.io/CMSIS_6/main/Core/group__NVIC__gr.html",
+    "sections": "NVIC函数、Vector Table"
+  },
+  "D03": {
+    "title": "Arm: Cutting through the confusion with interrupt priorities",
+    "url": "https://developer.arm.com/community/arm-community-blogs/b/embedded-and-microcontrollers-blog/posts/cutting-through-the-confusion-with-arm-cortex-m-interrupt-priorities",
+    "sections": "优先级紧迫性与CMSIS参数"
+  }
+}

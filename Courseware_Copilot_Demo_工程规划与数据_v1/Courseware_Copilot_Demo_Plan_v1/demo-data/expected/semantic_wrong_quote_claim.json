@@ -1,0 +1,16 @@
+{
+  "id": "c_wrong_semantic",
+  "text": "在Cortex-M中断编码中，数值越大越紧迫。",
+  "kind": "direct",
+  "evidence_refs": [
+    {
+      "chunk_id": "chunk_notes_04",
+      "document_id": "doc_notes",
+      "pdf_page": 4,
+      "start": 67,
+      "end": 104,
+      "quote": "在这里讨论的Cortex-M中断优先级编码中，较小的数值表示较高的紧迫性。"
+    }
+  ],
+  "rationale": null
+}

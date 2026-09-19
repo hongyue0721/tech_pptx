@@ -1,0 +1,149 @@
+[
+  {
+    "method": "GET",
+    "path": "/health",
+    "request": null,
+    "status": 200,
+    "response": "Health"
+  },
+  {
+    "method": "POST",
+    "path": "/projects",
+    "request": "CreateProjectRequest",
+    "status": 201,
+    "response": "Project"
+  },
+  {
+    "method": "GET",
+    "path": "/projects/{project_id}",
+    "request": null,
+    "status": 200,
+    "response": "Project"
+  },
+  {
+    "method": "DELETE",
+    "path": "/projects/{project_id}",
+    "request": "ConfirmDeleteRequest",
+    "status": 204,
+    "response": null
+  },
+  {
+    "method": "POST",
+    "path": "/projects/{project_id}/materials",
+    "request": "@multipart",
+    "status": 202,
+    "response": "MaterialUploadAccepted"
+  },
+  {
+    "method": "GET",
+    "path": "/projects/{project_id}/materials",
+    "request": null,
+    "status": 200,
+    "response": "MaterialList"
+  },
+  {
+    "method": "POST",
+    "path": "/projects/{project_id}/plans",
+    "request": "PlanRequest",
+    "status": 202,
+    "response": "JobAccepted"
+  },
+  {
+    "method": "GET",
+    "path": "/projects/{project_id}/plans/{plan_id}",
+    "request": null,
+    "status": 200,
+    "response": "LessonPlan"
+  },
+  {
+    "method": "POST",
+    "path": "/projects/{project_id}/plans/{plan_id}/confirm",
+    "request": "ConfirmPlanRequest",
+    "status": 200,
+    "response": "LessonPlan"
+  },
+  {
+    "method": "POST",
+    "path": "/projects/{project_id}/generations",
+    "request": "GenerateRequest",
+    "status": 202,
+    "response": "JobAccepted"
+  },
+  {
+    "method": "GET",
+    "path": "/jobs/{job_id}",
+    "request": null,
+    "status": 200,
+    "response": "Job"
+  },
+  {
+    "method": "POST",
+    "path": "/jobs/{job_id}/cancel",
+    "request": null,
+    "status": 200,
+    "response": "Job"
+  },
+  {
+    "method": "GET",
+    "path": "/projects/{project_id}/deck",
+    "request": null,
+    "status": 200,
+    "response": "DeckSpec"
+  },
+  {
+    "method": "POST",
+    "path": "/projects/{project_id}/edits",
+    "request": "EditRequest",
+    "status": 202,
+    "response": "JobAccepted"
+  },
+  {
+    "method": "GET",
+    "path": "/projects/{project_id}/changes/{change_id}",
+    "request": null,
+    "status": 200,
+    "response": "CandidateChange"
+  },
+  {
+    "method": "POST",
+    "path": "/projects/{project_id}/changes/{change_id}/commit",
+    "request": "CommitRequest",
+    "status": 201,
+    "response": "DeckVersion"
+  },
+  {
+    "method": "POST",
+    "path": "/projects/{project_id}/restores",
+    "request": "RestoreRequest",
+    "status": 201,
+    "response": "DeckVersion"
+  },
+  {
+    "method": "GET",
+    "path": "/projects/{project_id}/evidence/{chunk_id}",
+    "request": null,
+    "status": 200,
+    "response": "DocumentChunk"
+  },
+  {
+    "method": "GET",
+    "path": "/projects/{project_id}/versions/{version}/previews",
+    "request": null,
+    "status": 200,
+    "response": "PreviewManifest"
+  },
+  {
+    "method": "POST",
+    "path": "/projects/{project_id}/exports",
+    "request": "ExportRequest",
+    "status": 202,
+    "response": "JobAccepted"
+  },
+  {
+    "method": "GET",
+    "path": "/projects/{project_id}/artifacts/{artifact_id}/download",
+    "request": null,
+    "status": 200,
+    "response": "@binary"
+  }
+]

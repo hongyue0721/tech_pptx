@@ -1,0 +1,9 @@
+# 机器契约
+
+models.schema.json定义完整服务端对象和请求；openapi.json为待实现API。JSON Schema仅约束形状，无法自行证明quote支持claim、外键有效、版本一致或任务原子性。
+
+正式fact仅通过claim_id显示正文；Claim.evidence_refs是服务端填充的EvidenceSpan对象数组。模型先输出EvidenceProposal，服务端定位转换为EvidenceSpan，不信模型自填页码。Candidate中的version是base_version+1的拟议值，提交时由服务端再次校验并分配，模型不能决定current_version。
+
+目标页仅replace/split/reorder；split必须恰好两页并给完整内容，不提供空动作。apply后移除不再引用的claim，共享claim改写分配新ID；非目标页hash保持。恢复只支持同当前corpus_revision的版本，旧语料版返回CORPUS_CHANGED，重新规划生成是P0恢复路径。
+
+Schema文件没有把根对象固定成某个业务类型，校验时按$defs选择，例如tools/validate_pack.py中的validate_type。FastAPI端点实现需用等价Pydantic模型；不可因为FastAPI自动OpenAPI不同就覆盖这里掩盖契约改变。

@@ -1,0 +1,487 @@
+[
+  {
+    "id": "T00",
+    "stage": "M0",
+    "title": "资格、账号、授权和预算",
+    "status": "PLANNED",
+    "depends_on": [],
+    "read_first": [
+      "docs/17-competition-delivery.md",
+      "docs/00-owner-guide.md"
+    ],
+    "allowed_paths": [
+      "process.md",
+      "private-evidence/",
+      "THIRD_PARTY.md"
+    ],
+    "acceptance": [
+      "确认学校窗口和真实队员分工",
+      "码道席位/自定义模型权限记录",
+      "外发材料/API/云预算由负责人决定",
+      "导出器第三方授权门禁记录"
+    ],
+    "constraints": "负责人主导，AI整理，不代购或代发",
+    "owner": "鸿岳（单人主开发）",
+    "evidence": []
+  },
+  {
+    "id": "T01",
+    "stage": "M0",
+    "title": "码道开发模型与Skill工具探针",
+    "status": "PLANNED",
+    "depends_on": [
+      "T00"
+    ],
+    "read_first": [
+      "docs/10-codearts-and-skill.md"
+    ],
+    "allowed_paths": [
+      "smoke/",
+      "docs/",
+      "process.md"
+    ],
+    "acceptance": [
+      "8项DEV smoke记录",
+      "最小Skill被加载且真实读写/运行测试",
+      "失败测试真实修复",
+      "会话导出脱敏索引"
+    ],
+    "constraints": "不通过不进入业务施工",
+    "owner": "鸿岳（单人主开发）",
+    "evidence": []
+  },
+  {
+    "id": "T02",
+    "stage": "M0",
+    "title": "AnyUI/PDF/导出器最小链",
+    "status": "PLANNED",
+    "depends_on": [
+      "T00"
+    ],
+    "read_first": [
+      "docs/03-stack-and-dependencies.md",
+      "docs/08-rendering-and-preview.md",
+      "docs/09-frontend.md"
+    ],
+    "allowed_paths": [
+      "smoke/",
+      "config/",
+      "THIRD_PARTY.md",
+      "docs/",
+      "process.md"
+    ],
+    "acceptance": [
+      "AnyUI实际安装生产构建",
+      "pypdf中文8页抽取",
+      "已授权Exporter生成可编辑PPTX",
+      "负责人目标Office打开；未打开标NOT_RUN"
+    ],
+    "constraints": "锁定一个Exporter与依赖版本",
+    "owner": "鸿岳（单人主开发）",
+    "evidence": []
+  },
+  {
+    "id": "T03",
+    "stage": "M1",
+    "title": "Schema/API与工程骨架",
+    "status": "PLANNED",
+    "depends_on": [
+      "T01",
+      "T02"
+    ],
+    "read_first": [
+      "api.md",
+      "contracts/README.md",
+      "docs/04-data-model.md"
+    ],
+    "allowed_paths": [
+      "backend/",
+      "frontend/",
+      "contracts/",
+      "api.md",
+      "docs/",
+      "process.md"
+    ],
+    "acceptance": [
+      "类型与契约对齐",
+      "基础项目创建/获取/错误响应",
+      "前端本地路由骨架",
+      "契约测试可运行"
+    ],
+    "constraints": "不实现未冻结功能",
+    "owner": "鸿岳（单人主开发）",
+    "evidence": []
+  },
+  {
+    "id": "T04",
+    "stage": "M1",
+    "title": "SQLite任务、幂等与版本仓库",
+    "status": "PLANNED",
+    "depends_on": [
+      "T03"
+    ],
+    "read_first": [
+      "docs/07-jobs-and-versioning.md"
+    ],
+    "allowed_paths": [
+      "backend/",
+      "tests/",
+      "docs/",
+      "process.md"
+    ],
+    "acceptance": [
+      "单Worker/项目锁",
+      "幂等同键与冲突",
+      "重启interrupted",
+      "原子文件与数据库指针一致"
+    ],
+    "constraints": "先可靠状态再接LLM",
+    "owner": "鸿岳（单人主开发）",
+    "evidence": []
+  },
+  {
+    "id": "T05",
+    "stage": "M1",
+    "title": "PDF导入、规范化与切块",
+    "status": "PLANNED",
+    "depends_on": [
+      "T04"
+    ],
+    "read_first": [
+      "docs/04-data-model.md",
+      "docs/11-security-privacy.md"
+    ],
+    "allowed_paths": [
+      "backend/",
+      "tests/",
+      "docs/",
+      "process.md"
+    ],
+    "acceptance": [
+      "正常/扫描/空/加密/损坏测试",
+      "页码/偏移/hash正确",
+      "限额/跨路径拒绝",
+      "每页质量警告"
+    ],
+    "constraints": "仅文本PDF，不OCR",
+    "owner": "鸿岳（单人主开发）",
+    "evidence": []
+  },
+  {
+    "id": "T06",
+    "stage": "M1",
+    "title": "检索、覆盖与证据定位",
+    "status": "PLANNED",
+    "depends_on": [
+      "T05"
+    ],
+    "read_first": [
+      "docs/05-evidence-policy.md"
+    ],
+    "allowed_paths": [
+      "backend/",
+      "tests/",
+      "docs/",
+      "process.md"
+    ],
+    "acceptance": [
+      "逐目标BM25检索",
+      "同项目同revision",
+      "quote唯一子串与精确偏移",
+      "改名/变体不特判"
+    ],
+    "constraints": "评估答案不得被运行读取",
+    "owner": "鸿岳（单人主开发）",
+    "evidence": []
+  },
+  {
+    "id": "T07",
+    "stage": "M2",
+    "title": "APP模型Adapter与预算",
+    "status": "PLANNED",
+    "depends_on": [
+      "T03"
+    ],
+    "read_first": [
+      "docs/06-llm-and-workflow.md"
+    ],
+    "allowed_paths": [
+      "backend/",
+      "tests/",
+      "config/",
+      ".env.example",
+      "docs/",
+      "process.md"
+    ],
+    "acceptance": [
+      "实际协议smoke",
+      "typed JSON/schema校验",
+      "429/timeout/401重试策略",
+      "预算/usageunknown/取消"
+    ],
+    "constraints": "独立于DEV模型",
+    "owner": "鸿岳（单人主开发）",
+    "evidence": []
+  },
+  {
+    "id": "T08",
+    "stage": "M2",
+    "title": "大纲生成和教师确认",
+    "status": "PLANNED",
+    "depends_on": [
+      "T06",
+      "T07"
+    ],
+    "read_first": [
+      "api.md",
+      "docs/01-prd.md"
+    ],
+    "allowed_paths": [
+      "backend/",
+      "tests/",
+      "docs/",
+      "process.md"
+    ],
+    "acceptance": [
+      "coverage缺口显示",
+      "draft/confirmed/stale",
+      "确认受支持目标",
+      "未确认不能生成"
+    ],
+    "constraints": "不给不存在资料补常识",
+    "owner": "鸿岳（单人主开发）",
+    "evidence": []
+  },
+  {
+    "id": "T09",
+    "stage": "M2",
+    "title": "候选课件、语义核验和提交",
+    "status": "PLANNED",
+    "depends_on": [
+      "T08",
+      "T04"
+    ],
+    "read_first": [
+      "docs/04-data-model.md",
+      "docs/05-evidence-policy.md"
+    ],
+    "allowed_paths": [
+      "backend/",
+      "tests/",
+      "docs/",
+      "process.md"
+    ],
+    "acceptance": [
+      "模型生成候选Deck",
+      "独立语义核验",
+      "假引用/冲突/缺证据阻塞",
+      "教师应用才更新version"
+    ],
+    "constraints": "核心可信逻辑不可降级跳过",
+    "owner": "鸿岳（单人主开发）",
+    "evidence": []
+  },
+  {
+    "id": "T10",
+    "stage": "M2",
+    "title": "固定模板渲染和版本导出",
+    "status": "PLANNED",
+    "depends_on": [
+      "T09",
+      "T02"
+    ],
+    "read_first": [
+      "docs/08-rendering-and-preview.md"
+    ],
+    "allowed_paths": [
+      "backend/",
+      "renderer/",
+      "tests/",
+      "docs/",
+      "process.md"
+    ],
+    "acceptance": [
+      "四布局固定",
+      "真实editable PPTX",
+      "artifact固定version",
+      "结构预览诚实降级"
+    ],
+    "constraints": "仅一个active Exporter",
+    "owner": "鸿岳（单人主开发）",
+    "evidence": []
+  },
+  {
+    "id": "T11",
+    "stage": "M3",
+    "title": "Vue教师创建与工作区",
+    "status": "PLANNED",
+    "depends_on": [
+      "T03",
+      "T08",
+      "T10"
+    ],
+    "read_first": [
+      "docs/09-frontend.md",
+      "api.md"
+    ],
+    "allowed_paths": [
+      "frontend/",
+      "tests/",
+      "docs/",
+      "process.md"
+    ],
+    "acceptance": [
+      "多PDF队列",
+      "大纲确认/候选应用",
+      "状态轮询/刷新/错误",
+      "来源Drawer/下载"
+    ],
+    "constraints": "只两个路由，复用AnyUI外壳",
+    "owner": "鸿岳（单人主开发）",
+    "evidence": []
+  },
+  {
+    "id": "T12",
+    "stage": "M3",
+    "title": "受限编辑、拆页与恢复",
+    "status": "PLANNED",
+    "depends_on": [
+      "T09"
+    ],
+    "read_first": [
+      "docs/04-data-model.md",
+      "docs/07-jobs-and-versioning.md"
+    ],
+    "allowed_paths": [
+      "backend/",
+      "frontend/",
+      "tests/",
+      "docs/",
+      "process.md"
+    ],
+    "acceptance": [
+      "replace/split/reorder受限patch",
+      "非目标hash不变",
+      "claim集合保留",
+      "restore新version且冲突拒绝"
+    ],
+    "constraints": "保留旧版本，模型不改current",
+    "owner": "鸿岳（单人主开发）",
+    "evidence": []
+  },
+  {
+    "id": "T13",
+    "stage": "M3",
+    "title": "原创Skill共享core落地",
+    "status": "PLANNED",
+    "depends_on": [
+      "T09",
+      "T10",
+      "T12"
+    ],
+    "read_first": [
+      "docs/10-codearts-and-skill.md",
+      "skill-template/teacher-courseware/SKILL.md"
+    ],
+    "allowed_paths": [
+      ".codeartsdoer/skills/",
+      "backend/",
+      "tests/",
+      "docs/",
+      "process.md"
+    ],
+    "acceptance": [
+      "目标CLI真实实现",
+      "独立data-dir锁",
+      "码道Skill黄金链实际运行",
+      "公开目录和安装说明不带大依赖"
+    ],
+    "constraints": "模板转实际Skill，不伪造已完成",
+    "owner": "鸿岳（单人主开发）",
+    "evidence": []
+  },
+  {
+    "id": "T14",
+    "stage": "M4",
+    "title": "全链回归和反例验收",
+    "status": "PLANNED",
+    "depends_on": [
+      "T11",
+      "T12",
+      "T13"
+    ],
+    "read_first": [
+      "docs/12-testing.md",
+      "demo-data/evaluation/README.md"
+    ],
+    "allowed_paths": [
+      "tests/",
+      "docs/",
+      "process.md"
+    ],
+    "acceptance": [
+      "3次APP_LIVE完整流程",
+      "变体/资料不足/冲突/注入",
+      "导出Office修改保存",
+      "截图与报告区分NOT_RUN"
+    ],
+    "constraints": "任何硬编码演示答案阻塞验收",
+    "owner": "鸿岳（单人主开发）",
+    "evidence": []
+  },
+  {
+    "id": "T15",
+    "stage": "M4",
+    "title": "保护性云部署和干净复现",
+    "status": "PLANNED",
+    "depends_on": [
+      "T14"
+    ],
+    "read_first": [
+      "docs/13-deployment.md"
+    ],
+    "allowed_paths": [
+      "deploy/",
+      "tests/",
+      "docs/",
+      "process.md"
+    ],
+    "acceptance": [
+      "负责人批准公网/费用",
+      "HTTPS/认证/Origin与限流",
+      "重启恢复",
+      "干净环境安装复测"
+    ],
+    "constraints": "不启动公开CodeArts Agent服务",
+    "owner": "鸿岳（单人主开发）",
+    "evidence": []
+  },
+  {
+    "id": "T16",
+    "stage": "M5",
+    "title": "比赛交付、视频和开源",
+    "status": "PLANNED",
+    "depends_on": [
+      "T15"
+    ],
+    "read_first": [
+      "docs/17-competition-delivery.md",
+      "docs/14-milestones-and-demo.md"
+    ],
+    "allowed_paths": [
+      "docs/",
+      "README.md",
+      "THIRD_PARTY.md",
+      "process.md"
+    ],
+    "acceptance": [
+      "实际技能AtomGit发布由负责人确认",
+      "脱敏码道记录/真实贡献",
+      "演示视频与完整局限",
+      "校内提交成功证据"
+    ],
+    "constraints": "不把规划包直接当最终产品材料",
+    "owner": "鸿岳（单人主开发）",
+    "evidence": []
+  }
+]

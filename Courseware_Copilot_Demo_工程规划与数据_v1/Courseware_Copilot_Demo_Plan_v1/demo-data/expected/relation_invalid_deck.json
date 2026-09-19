@@ -1,0 +1,282 @@
+{
+  "schema_version": "1.0.0",
+  "project_id": "project_demo_fixture",
+  "version": 1,
+  "corpus_revision": 2,
+  "course": {
+    "topic": "STM32中断基础与优先级判断",
+    "audience": "大学二年级电子信息专业，已学习C语言基础",
+    "duration_minutes": 45,
+    "goals": [
+      "区分挂起和活动状态",
+      "正确理解优先级数值与紧迫性",
+      "区分抢占字段和子字段的作用",
+      "通过明确条件的案例说明判断过程"
+    ],
+    "target_slides": 8
+  },
+  "claims": [
+    {
+      "id": "c01",
+      "text": "NVIC用于管理Cortex-M的中断。",
+      "kind": "direct",
+      "evidence_refs": [
+        {
+          "chunk_id": "chunk_notes_02",
+          "document_id": "doc_notes",
+          "pdf_page": 2,
+          "start": 66,
+          "end": 86,
+          "quote": "NVIC用于管理Cortex-M的中断。"
+        }
+      ],
+      "rationale": null
+    },
+    {
+      "id": "c02",
+      "text": "挂起表示请求等待处理，活动表示处理程序正在执行。",
+      "kind": "direct",
+      "evidence_refs": [
+        {
+          "chunk_id": "chunk_notes_03",
+          "document_id": "doc_notes",
+          "pdf_page": 3,
+          "start": 67,
+          "end": 91,
+          "quote": "挂起表示请求等待处理，活动表示处理程序正在执行。"
+        }
+      ],
+      "rationale": null
+    },
+    {
+      "id": "c03",
+      "text": "挂起请求能否运行，还取决于优先级、使能和屏蔽等条件。",
+      "kind": "direct",
+      "evidence_refs": [
+        {
+          "chunk_id": "chunk_notes_03",
+          "document_id": "doc_notes",
+          "pdf_page": 3,
+          "start": 116,
+          "end": 158,
+          "quote": "存在挂起请求并不意味着它会立刻运行；是否能够进入还取决于优先级以及使能和屏蔽等条件。"
+        }
+      ],
+      "rationale": null
+    },
+    {
+      "id": "c04",
+      "text": "在本课讨论的Cortex-M编码中，数值较小表示更高紧迫性。",
+      "kind": "direct",
+      "evidence_refs": [
+        {
+          "chunk_id": "chunk_notes_04",
+          "document_id": "doc_notes",
+          "pdf_page": 4,
+          "start": 67,
+          "end": 104,
+          "quote": "在这里讨论的Cortex-M中断优先级编码中，较小的数值表示较高的紧迫性。"
+        }
+      ],
+      "rationale": null
+    },
+    {
+      "id": "c05",
+      "text": "同抢占优先级的中断不会仅因子优先级不同而相互抢占。",
+      "kind": "direct",
+      "evidence_refs": [
+        {
+          "chunk_id": "chunk_notes_05",
+          "document_id": "doc_notes",
+          "pdf_page": 5,
+          "start": 84,
+          "end": 110,
+          "quote": "同抢占优先级的中断不会仅因为子优先级不同而相互抢占。"
+        }
+      ],
+      "rationale": null
+    },
+    {
+      "id": "c06",
+      "text": "同抢占优先级的多个可处理挂起请求，可由子优先级确定先后。",
+      "kind": "direct",
+      "evidence_refs": [
+        {
+          "chunk_id": "chunk_notes_05",
+          "document_id": "doc_notes",
+          "pdf_page": 5,
+          "start": 111,
+          "end": 152,
+          "quote": "多个同抢占优先级的请求同时处于可处理的挂起状态时，子优先级用于确定它们的处理先后。"
+        }
+      ],
+      "rationale": null
+    },
+    {
+      "id": "c07",
+      "text": "CMSIS的NVIC_SetPriority接收逻辑优先级值，不应先按寄存器高位位置左移后传入。",
+      "kind": "direct",
+      "evidence_refs": [
+        {
+          "chunk_id": "chunk_notes_07",
+          "document_id": "doc_notes",
+          "pdf_page": 7,
+          "start": 70,
+          "end": 128,
+          "quote": "使用CMSIS的NVIC_SetPriority时，传入的是逻辑优先级值，不应再次手工按寄存器高位位置左\n移后传入。"
+        }
+      ],
+      "rationale": null
+    },
+    {
+      "id": "c08",
+      "text": "在案例A的共同假设下，B具备抢占A的优先级条件。",
+      "kind": "direct",
+      "evidence_refs": [
+        {
+          "chunk_id": "chunk_cases_02",
+          "document_id": "doc_cases",
+          "pdf_page": 2,
+          "start": 118,
+          "end": 143,
+          "quote": "B的抢占字段数值更小，因此具备抢占A的优先级条件。"
+        }
+      ],
+      "rationale": null
+    },
+    {
+      "id": "c09",
+      "text": "在案例B中，B不能只因子字段数值更小而抢占正在执行的A。",
+      "kind": "direct",
+      "evidence_refs": [
+        {
+          "chunk_id": "chunk_cases_03",
+          "document_id": "doc_cases",
+          "pdf_page": 3,
+          "start": 107,
+          "end": 130,
+          "quote": "B不能只因为子字段数值更小就抢占正在执行的A。"
+        }
+      ],
+      "rationale": null
+    }
+  ],
+  "slides": [
+    {
+      "id": "slide_01",
+      "title": "STM32中断基础与判断方法",
+      "layout": "title",
+      "blocks": [
+        {
+          "type": "teaching",
+          "text": "45分钟课堂：先理解状态，再判断抢占。"
+        }
+      ]
+    },
+    {
+      "id": "slide_02",
+      "title": "NVIC在做什么",
+      "layout": "concept",
+      "blocks": [
+        {
+          "type": "fact",
+          "claim_id": "c01"
+        },
+        {
+          "type": "teaching",
+          "text": "用事件来源、控制判断、处理函数三张卡片说明过程。"
+        }
+      ]
+    },
+    {
+      "id": "slide_03",
+      "title": "等待与执行是两回事",
+      "layout": "two_column",
+      "blocks": [
+        {
+          "type": "fact",
+          "claim_id": "DOES_NOT_EXIST"
+        },
+        {
+          "type": "fact",
+          "claim_id": "c03"
+        }
+      ]
+    },
+    {
+      "id": "slide_04",
+      "title": "先把优先级数字读对",
+      "layout": "concept",
+      "blocks": [
+        {
+          "type": "fact",
+          "claim_id": "c04"
+        },
+        {
+          "type": "teaching",
+          "text": "课堂比较：2和5，哪一个更紧迫？说明适用条件。"
+        }
+      ]
+    },
+    {
+      "id": "slide_05",
+      "title": "抢占与排队先后分别判断",
+      "layout": "two_column",
+      "blocks": [
+        {
+          "type": "fact",
+          "claim_id": "c05"
+        },
+        {
+          "type": "fact",
+          "claim_id": "c06"
+        }
+      ]
+    },
+    {
+      "id": "slide_06",
+      "title": "案例A与案例B",
+      "layout": "process_example",
+      "blocks": [
+        {
+          "type": "fact",
+          "claim_id": "c08"
+        },
+        {
+          "type": "fact",
+          "claim_id": "c09"
+        },
+        {
+          "type": "teaching",
+          "text": "先说明共同假设和活动状态，再解释比较字段。"
+        }
+      ]
+    },
+    {
+      "id": "slide_07",
+      "title": "库函数参数不要重复移位",
+      "layout": "concept",
+      "blocks": [
+        {
+          "type": "fact",
+          "claim_id": "c07"
+        },
+        {
+          "type": "teaching",
+          "text": "对照所用器件定义，避免照搬寄存器写法。"
+        }
+      ]
+    },
+    {
+      "id": "slide_08",
+      "title": "结课检查：结论、条件、依据",
+      "layout": "concept",
+      "blocks": [
+        {
+          "type": "teaching",
+          "text": "任选一个结论，指出资料页；说明缺少哪些条件时不能下判断。"
+        }
+      ]
+    }
+  ]
+}

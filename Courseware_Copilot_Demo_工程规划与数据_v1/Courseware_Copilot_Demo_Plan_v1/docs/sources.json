@@ -1,0 +1,170 @@
+[
+  {
+    "id": "S01",
+    "title": "华为命题页面",
+    "url": "https://cy.ncss.cn/mtcontest/detail?id=2c93f4c6a00f063201a03d77f6721089",
+    "type": "企业原始题面",
+    "support": "教育场景；全程码道开发；开发记录、Demo视频、原创Skill与AtomGit；云端部署目标",
+    "checked_at": "2026-09-18"
+  },
+  {
+    "id": "S02",
+    "title": "2026产业赛道方案（高校转载官方附件）",
+    "url": "https://cxcy.cczu.edu.cn/_upload/article/files/1f/f5/70bf69134a32b315af4da124b331/11d2a896-6aa1-4266-80f1-d83e864ebc83.pdf",
+    "type": "官方方案附件，已查阅4页",
+    "support": "团队3—15人且须实际核心成员；9月25日12时截止；揭榜项目少于5项的命题原则上不列入后续评审",
+    "checked_at": "2026-09-18"
+  },
+  {
+    "id": "S03",
+    "title": "码道CLI：自定义模型",
+    "url": "https://support.huaweicloud.com/usermanual-cli/codeartsagent_cli_00022.html",
+    "type": "华为官方，页面更新2026-09-10",
+    "support": "Chat Completions / Anthropic Messages；席位与部分套餐管理员权限；自定义模型配置",
+    "checked_at": "2026-09-18"
+  },
+  {
+    "id": "S04",
+    "title": "码道：技能用户指南",
+    "url": "https://support.huaweicloud.com/intl/zh-cn/usermanual-codeartsagent/codeartsagent_ug_0024.html",
+    "type": "华为官方IDE指南",
+    "support": "SKILL.md元数据、目录；本地项目目录；ZIP导入上限5M。不能直接当CLI所有行为的保证",
+    "checked_at": "2026-09-18"
+  },
+  {
+    "id": "S05",
+    "title": "码道CLI：命令",
+    "url": "https://support.huaweicloud.com/usermanual-cli/codeartsagent_cli_0034.html",
+    "type": "华为官方",
+    "support": "models、session list、export；CLI的SDD命令不带斜杠；仍以安装版本help为准",
+    "checked_at": "2026-09-18"
+  },
+  {
+    "id": "S06",
+    "title": "码道SDD标准工作流",
+    "url": "https://support.huaweicloud.com/intl/zh-cn/bestpractice-codeartsagent/codeartsagent_bp_0011.html",
+    "type": "华为官方",
+    "support": "spec→design→tasks→实现，阶段确认",
+    "checked_at": "2026-09-18"
+  },
+  {
+    "id": "S07",
+    "title": "什么是码道CLI",
+    "url": "https://support.huaweicloud.com/usermanual-cli/codeartsagent_cli_0001.html",
+    "type": "华为官方",
+    "support": "支持Ubuntu 22.04/24.04等；不把未列出的Arch说成已受支持",
+    "checked_at": "2026-09-18"
+  },
+  {
+    "id": "S08",
+    "title": "AnyUI package.json",
+    "url": "https://github.com/any-design/anyui/blob/main/package.json",
+    "type": "GitHub连接器只读核查，blob 88dd904f4b2564341e8187084b3551b527a69a16",
+    "support": "仓库版本0.5.2、Vue入口和peerDependencies；不等于npm包已安装验证",
+    "checked_at": "2026-09-18"
+  },
+  {
+    "id": "S09",
+    "title": "AnyUI README与组件源码",
+    "url": "https://github.com/any-design/anyui",
+    "type": "此前当前会话已读取README及AUpload/ASplit/AChat源码",
+    "support": "WIP；Vue用法；Upload只是文件选择、Split不是拖拽分栏、Chat不是业务Agent",
+    "checked_at": "2026-09-18"
+  },
+  {
+    "id": "S10",
+    "title": "ppt-edit包元数据",
+    "url": "https://github.com/hongyue0721/ppt-edit-skill/blob/main/package.json",
+    "type": "私有仓库连接器只读，blob 0d522c1e7f16cb93a79b24ded2d59996f719dc13",
+    "support": "1.3.0；作者字段binaryify；独立核查贡献来源，字段本身不是作者归属判决",
+    "checked_at": "2026-09-18"
+  },
+  {
+    "id": "S11",
+    "title": "ppt-edit local-export说明",
+    "url": "https://github.com/hongyue0721/ppt-edit-skill/blob/main/skills/ppt-edit/scripts/local-export/README.md",
+    "type": "私有仓库连接器只读，blob 8c0e4c006ccee71649bd994e6ec4befa89e922a5",
+    "support": "说明存在patched WASM。分发前必须明确其上游来源、许可、可复现构建及使用授权，不直接背书",
+    "checked_at": "2026-09-18"
+  },
+  {
+    "id": "S12",
+    "title": "ppt-edit LICENSE",
+    "url": "https://github.com/hongyue0721/ppt-edit-skill/blob/main/LICENSE",
+    "type": "私有仓库连接器只读，blob acdaf25b17b3e0367c525ba2509abef05962876c",
+    "support": "根目录MIT声明；不能自动覆盖未知第三方编辑器、WASM和素材",
+    "checked_at": "2026-09-18"
+  },
+  {
+    "id": "S13",
+    "title": "pypdf LICENSE",
+    "url": "https://github.com/py-pdf/pypdf/blob/main/LICENSE",
+    "type": "GitHub连接器已读",
+    "support": "BSD式三条款；分发保留许可与声明",
+    "checked_at": "2026-09-18"
+  },
+  {
+    "id": "S14",
+    "title": "pypdf文本提取",
+    "url": "https://pypdf.readthedocs.io/en/stable/user/extract-text.html",
+    "type": "官方文档",
+    "support": "文本提取不是OCR；布局、字符顺序及扫描件限制",
+    "checked_at": "2026-09-18"
+  },
+  {
+    "id": "S15",
+    "title": "PyMuPDF许可说明",
+    "url": "https://pymupdf.readthedocs.io/en/latest/about.html",
+    "type": "官方文档License and Copyright",
+    "support": "AGPL/商业双许可；此前未评估许可就锁定是不充分的",
+    "checked_at": "2026-09-18"
+  },
+  {
+    "id": "S16",
+    "title": "PptxGenJS",
+    "url": "https://gitbrent.github.io/PptxGenJS/",
+    "type": "项目官方文档",
+    "support": "备选PPTX生成实现；本轮未安装/未运行",
+    "checked_at": "2026-09-18"
+  },
+  {
+    "id": "S17",
+    "title": "Vite Getting Started",
+    "url": "https://vite.dev/guide/",
+    "type": "官方文档",
+    "support": "Node兼容要求20.19+或22.12+；不能沿用ppt-edit的Node18最低要求给整个项目",
+    "checked_at": "2026-09-18"
+  },
+  {
+    "id": "S18",
+    "title": "FastAPI Background Tasks",
+    "url": "https://fastapi.tiangolo.com/tutorial/background-tasks/",
+    "type": "官方文档",
+    "support": "支持响应后任务；不能因此推导持久化任务队列或崩溃恢复保证",
+    "checked_at": "2026-09-18"
+  },
+  {
+    "id": "D01",
+    "title": "STM32 Cortex-M4 PM0214 Rev10",
+    "url": "https://www.st.com/resource/en/programming_manual/pm0214-stm32-cortexm4-mcus-and-mpus-programming-manual-stmicroelectronics.pdf",
+    "type": "ST原始手册；已查看41—43页图像与相关文本",
+    "support": "异常进入/返回、优先级与分组。演示讲义是重新编写的简化材料，不分发官方手册全文",
+    "checked_at": "2026-09-18"
+  },
+  {
+    "id": "D02",
+    "title": "CMSIS-Core Interrupts and Exceptions (NVIC)",
+    "url": "https://arm-software.github.io/CMSIS_6/main/Core/group__NVIC__gr.html",
+    "type": "Arm官方API文档",
+    "support": "NVIC优先级、pending/active及CMSIS接口",
+    "checked_at": "2026-09-18"
+  },
+  {
+    "id": "D03",
+    "title": "Cutting Through the Confusion with Arm Cortex-M Interrupt Priorities",
+    "url": "https://developer.arm.com/community/arm-community-blogs/b/embedded-and-microcontrollers-blog/posts/cutting-through-the-confusion-with-arm-cortex-m-interrupt-priorities",
+    "type": "Arm官方技术社区署名技术文章",
+    "support": "优先级数值与紧迫性、CMSIS参数对齐；只用事实进行独立编写，不复制文章或图",
+    "checked_at": "2026-09-18"
+  }
+]

@@ -1,0 +1,7 @@
+# 参考fixture，不是产品生成结果
+
+reference_deck.json是本包人工编排的8页参考语义课件，供Schema、渲染、前端fixture测试使用。它未经过真实APP模型生成，不能拿来证明模型质量或码道运行成功。
+
+reference_chunks.json来自随包PDF的真实pypdf文本抽取，并为引文提供精确字符偏移。semantic_wrong_quote_claim结构合法、引用能定位，但结论相反，必须在语义核验阶段失败。relation_invalid_deck形状合法但claim关联不存在，必须业务关联检查失败。split_patch是受限编辑契约例子。
+
+这些文件只能由测试代码或显式fixture模式读入；真实live生成禁止读取。不能把人工fixture的claim检查写成模型实际核验。

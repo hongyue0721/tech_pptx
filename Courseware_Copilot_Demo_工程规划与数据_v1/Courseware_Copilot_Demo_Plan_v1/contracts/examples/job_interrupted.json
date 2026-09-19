@@ -1,0 +1,22 @@
+{
+  "id": "job_example",
+  "project_id": "project_demo_fixture",
+  "kind": "generate",
+  "status": "interrupted",
+  "stage": "generating",
+  "cancel_requested": false,
+  "base_version": 0,
+  "corpus_revision": 2,
+  "result_ref": null,
+  "error": {
+    "error": {
+      "code": "JOB_INTERRUPTED",
+      "message": "服务在生成过程中重启，未自动重放推理请求。",
+      "request_id": "req_example",
+      "details": {}
+    }
+  },
+  "created_at": "2026-09-18T00:00:00Z",
+  "updated_at": "2026-09-18T00:01:00Z",
+  "llm_calls": 2
+}

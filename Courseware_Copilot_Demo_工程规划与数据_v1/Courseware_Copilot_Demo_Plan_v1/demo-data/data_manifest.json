@@ -1,0 +1,256 @@
+{
+  "version": "1.0.0",
+  "license_note": "本包自编教学/测试数据；第三方资料只列来源，未分发全文。",
+  "files": [
+    {
+      "path": "README.md",
+      "bytes": 1616,
+      "sha256": "3426850586bfe145412a7f0fadb0b48b325238a429f647ad883c8b137dad18a1",
+      "role": "documentation"
+    },
+    {
+      "path": "evaluation/README.md",
+      "bytes": 773,
+      "sha256": "7086ee2910473fae1278ab79d220842b0bf176b98dea6ace219ed79dba2eead7",
+      "role": "evaluation"
+    },
+    {
+      "path": "evaluation/cases.json",
+      "bytes": 11728,
+      "sha256": "0b9e606d185a2b59795603a725548dac80e57e6c554b54245bf2b2647c5a115c",
+      "role": "evaluation"
+    },
+    {
+      "path": "expected/README.md",
+      "bytes": 764,
+      "sha256": "800ca00293f9e53e639732fa81171557ad69201f7b53983eb96c8acfcf17aefc",
+      "role": "expected"
+    },
+    {
+      "path": "expected/reference_chunks.json",
+      "bytes": 16129,
+      "sha256": "3f4798dc328b5cab2a15094087643308c7fe9e183b98d393b65700d206db2adf",
+      "role": "expected"
+    },
+    {
+      "path": "expected/reference_deck.json",
+      "bytes": 7522,
+      "sha256": "e921b1b86b8e16ea956fcbde6931733baae33b486e113c1b5fa6ef2b3c73ed9c",
+      "role": "expected"
+    },
+    {
+      "path": "expected/relation_invalid_deck.json",
+      "bytes": 7533,
+      "sha256": "2472554e97c399b16a627bf0fd0022d704a55e887080148ff79a02d9156be9c8",
+      "role": "expected"
+    },
+    {
+      "path": "expected/semantic_wrong_quote_claim.json",
+      "bytes": 418,
+      "sha256": "ec6201c2359a088c53841c384a7053df1bc8fa060ee14a0728dae84b13e6ed58",
+      "role": "expected"
+    },
+    {
+      "path": "expected/split_patch.json",
+      "bytes": 796,
+      "sha256": "f5560564ca551b093ec76e5ffc24d4c357f9e0c6a72ac6af1feae1d5f7002af1",
+      "role": "expected"
+    },
+    {
+      "path": "inputs/01_stm32_interrupt_notes.pdf",
+      "bytes": 162591,
+      "sha256": "1e04fd57cb295a4a0dd8048e6ad622b6b0d94251eeaad815e5eb0fb6db9c6025",
+      "role": "inputs",
+      "encrypted": false,
+      "pages": 8
+    },
+    {
+      "path": "inputs/02_priority_casebook.pdf",
+      "bytes": 106833,
+      "sha256": "649aead06e31ece661d86bbb4d216870a0289d779bf4aff7533a0b983347d163",
+      "role": "inputs",
+      "encrypted": false,
+      "pages": 4
+    },
+    {
+      "path": "lesson_request.json",
+      "bytes": 453,
+      "sha256": "a94d671c6274d2f47724a69024e7be906e6edc5c5cdb58f4a362d552508a56b9",
+      "role": "documentation"
+    },
+    {
+      "path": "negative/blank.pdf",
+      "bytes": 445,
+      "sha256": "14ea8954d1f909e19a505d5d213a3c0340e3d84e4d5f70497995747d8ce8d216",
+      "role": "negative",
+      "encrypted": false,
+      "pages": 1
+    },
+    {
+      "path": "negative/conflicting_priority.pdf",
+      "bytes": 48420,
+      "sha256": "9774099262857b94f5c077854fcf7fbdfc620ecbbec847334197ce0464c7f0db",
+      "role": "negative",
+      "encrypted": false,
+      "pages": 1
+    },
+    {
+      "path": "negative/encrypted.pdf",
+      "bytes": 151291,
+      "sha256": "35bdb94c6f2098f1b8322cce9a0ed1c6201aae5463d495ef0ffb0ead351f1db4",
+      "role": "negative",
+      "encrypted": true
+    },
+    {
+      "path": "negative/irrelevant_material.pdf",
+      "bytes": 50282,
+      "sha256": "74a188ca6ca2562a9375a9efed1cb59e1314f0a6176cb576bb4c77bd02da7a1a",
+      "role": "negative",
+      "encrypted": false,
+      "pages": 1
+    },
+    {
+      "path": "negative/malformed.pdf",
+      "bytes": 56,
+      "sha256": "d01f19072a0b8ead0cade918f1eb1cf8091b543533dea220d6f25403cea5d36e",
+      "role": "negative",
+      "intentionally_invalid": true
+    },
+    {
+      "path": "negative/mixed_text_scan.pdf",
+      "bytes": 196225,
+      "sha256": "2391778d3bf28496b7c903f18f7c2fe89200398c34bb69f95670061355a8d339",
+      "role": "negative",
+      "encrypted": false,
+      "pages": 2
+    },
+    {
+      "path": "negative/prompt_injection.pdf",
+      "bytes": 50142,
+      "sha256": "2413d5d15ffcfd60cf84cc99bbfb1545c3dde085a68c7753e6c7a6592fa53ae8",
+      "role": "negative",
+      "encrypted": false,
+      "pages": 1
+    },
+    {
+      "path": "negative/scanned_only.pdf",
+      "bytes": 46063,
+      "sha256": "332617625cd2129b039f7ad2ce76671eda5eb365e63dac46228f45673dd5fa62",
+      "role": "negative",
+      "encrypted": false,
+      "pages": 1
+    },
+    {
+      "path": "optional/03_classroom_log_supplement.pdf",
+      "bytes": 89489,
+      "sha256": "f68ae55438f49cdd33d8920eda0530a961642a6361a5e108724eae9d807e1a19",
+      "role": "optional",
+      "encrypted": false,
+      "pages": 2
+    },
+    {
+      "path": "source-pages/01_stm32_interrupt_notes.json",
+      "bytes": 6765,
+      "sha256": "0dffef25eecc976441ac6b745ea8bb80e05fbb3529714689677ec8627827c3c6",
+      "role": "source-pages"
+    },
+    {
+      "path": "source-pages/01_stm32_interrupt_notes.md",
+      "bytes": 6044,
+      "sha256": "741a05aee8dd57969d2bcb1bc782404a817322a966385e269723611e40be8271",
+      "role": "source-pages"
+    },
+    {
+      "path": "source-pages/02_priority_casebook.json",
+      "bytes": 3247,
+      "sha256": "f46ef88b6b180b2fc925286632ec26693aa6109c39d52fddf5bc45975325dc60",
+      "role": "source-pages"
+    },
+    {
+      "path": "source-pages/02_priority_casebook.md",
+      "bytes": 2850,
+      "sha256": "7843b693a919ce79662ca404a1ffa2047048136a91d7e9614d78b9b62b4f4fdb",
+      "role": "source-pages"
+    },
+    {
+      "path": "source-pages/03_classroom_log_supplement.json",
+      "bytes": 1727,
+      "sha256": "d98cda1c78429797c4b9d5b1ede84a9dbcc732307d0bf2157c3359a07cd64d15",
+      "role": "source-pages"
+    },
+    {
+      "path": "source-pages/03_classroom_log_supplement.md",
+      "bytes": 1481,
+      "sha256": "f8a2edce925caf0a7145217a65ae103c1a4ff75b2df353bf709ccedfdbd04e54",
+      "role": "source-pages"
+    },
+    {
+      "path": "source-pages/conflicting_priority.json",
+      "bytes": 645,
+      "sha256": "8f21f9591e92c4198ff44146e20b8931ad51c077fad490bdfc74dda22895a931",
+      "role": "source-pages"
+    },
+    {
+      "path": "source-pages/conflicting_priority.md",
+      "bytes": 486,
+      "sha256": "3755aa46688847bf05df865dd5588f4fcd2da5a470f891b32d873f2e1743e14b",
+      "role": "source-pages"
+    },
+    {
+      "path": "source-pages/irrelevant_material.json",
+      "bytes": 670,
+      "sha256": "395c477e69b895b0253681b6ff148044e47f472eda04694eeb89d28d87cc8f4b",
+      "role": "source-pages"
+    },
+    {
+      "path": "source-pages/irrelevant_material.md",
+      "bytes": 512,
+      "sha256": "76d179b82d3c1f5da48606ec33aee565d7214fe3b21885b13789881c40779402",
+      "role": "source-pages"
+    },
+    {
+      "path": "source-pages/prompt_injection.json",
+      "bytes": 671,
+      "sha256": "73b81e6a489691f143984ca58d55b8c676abf5d67f2d7f0315df66ebc6894673",
+      "role": "source-pages"
+    },
+    {
+      "path": "source-pages/prompt_injection.md",
+      "bytes": 516,
+      "sha256": "3ed46ca8daefbdf525106b55d83cbf2d093c7d28c4aaa7988a10e8da228431cf",
+      "role": "source-pages"
+    },
+    {
+      "path": "source-pages/renamed_reordered_notes.json",
+      "bytes": 3280,
+      "sha256": "acfac211574aa90e791e75a9441b9758879af55eb0d2d9389e846cade5f0f9d1",
+      "role": "source-pages"
+    },
+    {
+      "path": "source-pages/renamed_reordered_notes.md",
+      "bytes": 2878,
+      "sha256": "b01de71dd9fa4cf2d169b902edc712f1a9f600fc95bfd44e617ae8ddc858a759",
+      "role": "source-pages"
+    },
+    {
+      "path": "sources.json",
+      "bytes": 776,
+      "sha256": "afea089be1d8f6de9fc4402582a4f222c44474286b6228127f481edd8d8941ad",
+      "role": "documentation"
+    },
+    {
+      "path": "sources.md",
+      "bytes": 921,
+      "sha256": "f217e15b2cf9d5924a7cbe5a7f1932192501499024e7f9b1247d04a85845e680",
+      "role": "documentation"
+    },
+    {
+      "path": "variants/renamed_reordered_notes.pdf",
+      "bytes": 106022,
+      "sha256": "06433c5877c89f53cd58d54db799071378ed58d498254029989c23f8cfe545e0",
+      "role": "variants",
+      "encrypted": false,
+      "pages": 4
+    }
+  ]
+}

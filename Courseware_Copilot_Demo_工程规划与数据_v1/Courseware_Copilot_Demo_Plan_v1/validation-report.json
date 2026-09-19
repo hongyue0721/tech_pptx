@@ -1,0 +1,155 @@
+{
+  "generated_at": "2026-09-18T15:55:23.336680+00:00",
+  "scope": "PACK_STATIC_ONLY",
+  "passed": 23,
+  "failed": 0,
+  "checks": [
+    {
+      "check": "JSON Schema definitions and references",
+      "category": "PACK_STATIC",
+      "status": "PASS",
+      "detail": "44 definitions, internal refs resolve"
+    },
+    {
+      "check": "OpenAPI and api.md route consistency",
+      "category": "PACK_STATIC",
+      "status": "PASS",
+      "detail": "21 route operations, parameters/responses/local refs checked (not full external OpenAPI conformance certification)"
+    },
+    {
+      "check": "Schema sample: demo-data/lesson_request.json",
+      "category": "PACK_STATIC",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "Schema sample: contracts/examples/create_project.json",
+      "category": "PACK_STATIC",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "Schema sample: contracts/examples/job_interrupted.json",
+      "category": "PACK_STATIC",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "Schema sample: demo-data/expected/reference_deck.json",
+      "category": "PACK_STATIC",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "Schema sample: demo-data/expected/split_patch.json",
+      "category": "PACK_STATIC",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "Schema sample: demo-data/expected/semantic_wrong_quote_claim.json",
+      "category": "PACK_STATIC",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "Schema sample: demo-data/expected/relation_invalid_deck.json",
+      "category": "PACK_STATIC",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "Fixture chunk hashes and physical PDF pages",
+      "category": "PACK_STATIC",
+      "status": "PASS",
+      "detail": "12 page-bounded chunks validated against actual PDF text"
+    },
+    {
+      "check": "Reference Deck relations and exact citations",
+      "category": "PACK_STATIC",
+      "status": "PASS",
+      "detail": "9 exact claim references, 8 slides; no semantic-model truth claim"
+    },
+    {
+      "check": "Schema-valid but relation-invalid negative control",
+      "category": "PACK_STATIC",
+      "status": "PASS",
+      "detail": "Deliberately invalid relation rejected after schema passes"
+    },
+    {
+      "check": "Semantic counterexample construction, not semantic verification",
+      "category": "PACK_STATIC",
+      "status": "PASS",
+      "detail": "Fixture has valid quote but reversed meaning. Actual semantic verifier NOT_RUN; this test only confirms negative control construction."
+    },
+    {
+      "check": "Reference split-patch invariants",
+      "category": "PACK_STATIC",
+      "status": "PASS",
+      "detail": "Reference patch construction preserves other slides and claims. Future app patch engine NOT_RUN."
+    },
+    {
+      "check": "Generated PDF positive and negative properties",
+      "category": "PACK_STATIC",
+      "status": "PASS",
+      "detail": "Main PDFs 12 text pages; supplementary 2; variant 4; deliberate encrypted/scan/blank/malformed/mixed properties checked"
+    },
+    {
+      "check": "Demo data manifest, byte lengths and SHA-256",
+      "category": "PACK_STATIC",
+      "status": "PASS",
+      "detail": "38 data files checked"
+    },
+    {
+      "check": "Evaluation case references",
+      "category": "PACK_STATIC",
+      "status": "PASS",
+      "detail": "39 evaluation definitions; no application execution implied"
+    },
+    {
+      "check": "Task dependency DAG and initial truth state",
+      "category": "PACK_STATIC",
+      "status": "PASS",
+      "detail": "17 planned task cards, acyclic dependencies and read paths"
+    },
+    {
+      "check": "Skill template metadata and scope",
+      "category": "PACK_STATIC",
+      "status": "PASS",
+      "detail": "Valid frontmatter and template disclosure; 3949 source bytes, not a real CodeArts import test"
+    },
+    {
+      "check": "Markdown local links",
+      "category": "PACK_STATIC",
+      "status": "PASS",
+      "detail": "Markdown clickable local links resolve"
+    },
+    {
+      "check": "Source marker registration",
+      "category": "PACK_STATIC",
+      "status": "PASS",
+      "detail": "21 source records, marker identifiers checked; relevance manually reviewed"
+    },
+    {
+      "check": "Package exclusion rules and placeholder configuration",
+      "category": "PACK_STATIC",
+      "status": "PASS",
+      "detail": "No standalone font files, live .env, known runtime directories or non-placeholder API key in template"
+    },
+    {
+      "check": "Required canonical documentation",
+      "category": "PACK_STATIC",
+      "status": "PASS",
+      "detail": "Required canonical documents present"
+    }
+  ],
+  "not_run": [
+    "CodeArts account permissions and custom model tool loop",
+    "AnyUI npm installation / Vue production build",
+    "Actual runtime model quality / billing / latency",
+    "Application API / SQLite jobs / browser E2E",
+    "ppt-edit asset authorization and exporter execution",
+    "PPTX output / PowerPoint or WPS editing",
+    "Cloud deployment / competition eligibility confirmation"
+  ]
+}

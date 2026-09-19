@@ -1,0 +1,36 @@
+{
+  "base_version": 1,
+  "corpus_revision": 2,
+  "operations": [
+    {
+      "op": "split_slide",
+      "target_slide_id": "slide_05",
+      "slides": [
+        {
+          "id": "slide_05",
+          "title": "抢占：能否打断当前处理",
+          "layout": "concept",
+          "blocks": [
+            {
+              "type": "fact",
+              "claim_id": "c05"
+            }
+          ]
+        },
+        {
+          "id": "slide_05b",
+          "title": "排队：同组挂起谁先处理",
+          "layout": "concept",
+          "blocks": [
+            {
+              "type": "fact",
+              "claim_id": "c06"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "claims": [],
+  "summary": "把原第5页拆成两页，保留c05和c06，不改变其他页面。"
+}

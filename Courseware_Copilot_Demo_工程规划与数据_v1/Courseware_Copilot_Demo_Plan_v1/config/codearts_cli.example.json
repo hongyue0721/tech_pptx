@@ -1,0 +1,20 @@
+{
+  "provider": {
+    "courseware-dev": {
+      "name": "Courseware development provider",
+      "npm": "@ai-sdk/openai-compatible",
+      "options": {
+        "apiKey": "REPLACE_LOCALLY_ONLY",
+        "baseURL": "https://api.example.invalid/v1",
+        "useFullUrl": false,
+        "timeout": 180000
+      },
+      "models": {
+        "REPLACE_WITH_ACTUAL_MODEL_ID": {
+          "name": "Configured development model",
+          "tool_call": true
+        }
+      }
+    }
+  }
+}

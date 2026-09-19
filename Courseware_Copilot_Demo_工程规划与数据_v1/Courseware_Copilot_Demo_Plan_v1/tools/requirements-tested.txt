@@ -1,0 +1,7 @@
+# Tool-only versions present during this package validation; not application dependencies.
+reportlab==4.4.9
+pypdf==5.9.0
+Pillow==12.3.0
+jsonschema==4.26.0
+markdown-it-py==4.2.0
+PyYAML==6.0.3
