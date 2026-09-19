@@ -1,0 +1,63 @@
+{
+  "extractor": "pypdf 6.19.0",
+  "pdf_pages": 8,
+  "pages": [
+    {
+      "pdf_page": 1,
+      "chars": 353,
+      "sha256": "99840e803ff5989192e601e9e2314ff7039b3be806c0da19c9bf3f9d01d9822e",
+      "has_chinese": true,
+      "head": "自编教学材料  /  资料约束型课件演示\nPDF 物理页 1\nSTM32中断基础｜教师讲义 / 01\n课程范围与学习目标"
+    },
+    {
+      "pdf_page": 2,
+      "chars": 337,
+      "sha256": "1ab53c4a011bed41d45accb46dea2e508070d931fd6da7cff765ceaee7977453",
+      "has_chinese": true,
+      "head": "自编教学材料  /  资料约束型课件演示\nPDF 物理页 2\nSTM32中断基础｜教师讲义 / 02\nNVIC与中断入口"
+    },
+    {
+      "pdf_page": 3,
+      "chars": 344,
+      "sha256": "d1d5cb58131f7c53095510cf6a04f76778787f9688616383779c9de1f0c69b2a",
+      "has_chinese": true,
+      "head": "自编教学材料  /  资料约束型课件演示\nPDF 物理页 3\nSTM32中断基础｜教师讲义 / 03\n挂起、活动与允许响"
+    },
+    {
+      "pdf_page": 4,
+      "chars": 331,
+      "sha256": "90fc42c5c88de9301be298dae4e007ede99d60fc23d2b378e410c500f400690d",
+      "has_chinese": true,
+      "head": "自编教学材料  /  资料约束型课件演示\nPDF 物理页 4\nSTM32中断基础｜教师讲义 / 04\n数值越小，紧迫性越"
+    },
+    {
+      "pdf_page": 5,
+      "chars": 320,
+      "sha256": "92fa0f55fc0e5ee0bfe8ee48ee7b2c227ff8e78bdca3454639b95a92fa08b47d",
+      "has_chinese": true,
+      "head": "自编教学材料  /  资料约束型课件演示\nPDF 物理页 5\nSTM32中断基础｜教师讲义 / 05\n抢占优先级与子优先"
+    },
+    {
+      "pdf_page": 6,
+      "chars": 332,
+      "sha256": "1fd927fbdae748c6aa2b0d2236c32bd3d43c122884ba14af6077ac759305b4e4",
+      "has_chinese": true,
+      "head": "自编教学材料  /  资料约束型课件演示\nPDF 物理页 6\nSTM32中断基础｜教师讲义 / 06\n进入与返回：不要丢"
+    },
+    {
+      "pdf_page": 7,
+      "chars": 343,
+      "sha256": "019b78905560c747e17a80b51aa2c68dc72657fab78d6384f0b952eb01b8b747",
+      "has_chinese": true,
+      "head": "自编教学材料  /  资料约束型课件演示\nPDF 物理页 7\nSTM32中断基础｜教师讲义 / 07\nCMSIS参数与寄"
+    },
+    {
+      "pdf_page": 8,
+      "chars": 341,
+      "sha256": "a2aba8d639ffe67cdc59bd7cc20c0887202d4d6613931fe78b2cefa2d708639e",
+      "has_chinese": true,
+      "head": "自编教学材料  /  资料约束型课件演示\nPDF 物理页 8\nSTM32中断基础｜教师讲义 / 08\n把知识变成一页可教"
+    }
+  ],
+  "total_chars": 2701
+}

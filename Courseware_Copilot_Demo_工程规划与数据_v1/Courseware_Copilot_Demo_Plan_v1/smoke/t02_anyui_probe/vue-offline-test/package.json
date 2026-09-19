@@ -1,0 +1,18 @@
+{
+  "name": "vue-offline-build-probe",
+  "private": true,
+  "version": "0.0.1",
+  "type": "module",
+  "scripts": {
+    "build": "vite build",
+    "typecheck": "vue-tsc --noEmit"
+  },
+  "dependencies": {
+    "vue": "3.5.41"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "6.0.8",
+    "typescript": "5.9.3",
+    "vite": "8.2.2"
+  }
+}

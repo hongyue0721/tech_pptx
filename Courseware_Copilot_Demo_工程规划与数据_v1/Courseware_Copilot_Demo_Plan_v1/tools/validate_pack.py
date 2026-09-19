@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Static planning/data checks only. Does NOT test the future application or models."""
 from __future__ import annotations
-import hashlib,json,re,sys,unicodedata,logging
+import hashlib,json,re,subprocess,sys,unicodedata,logging
 from datetime import datetime,timezone
 from pathlib import Path
 from pypdf import PdfReader
@@ -20,6 +20,13 @@ def expect(ok,message):
 def load(rel):return json.loads((ROOT/rel).read_text(encoding='utf-8'))
 def sha(b):return hashlib.sha256(b).hexdigest()
 def norm(t):return unicodedata.normalize('NFC',t.replace('\r\n','\n').replace('\r','\n').replace('\0','')).strip()
+def distribution_files():
+ # PACK静态校验的对象是将被分发的内容（git跟踪+未跟踪非ignore），不是本机运行时环境（node_modules/.venv等被gitignore排除）
+ out=subprocess.run(['git','ls-files','--cached','--others','--exclude-standard'],cwd=ROOT,capture_output=True,text=True)
+ expect(out.returncode==0,'git repository required for distribution view: '+out.stderr.strip())
+ return [ROOT/l for l in out.stdout.splitlines() if l]
+def distribution_md_files():
+ return [p for p in distribution_files() if p.suffix.lower()=='.md']
 
 schema=load('contracts/models.schema.json')
 D=schema['$defs']
@@ -177,7 +184,7 @@ def skill_checks():
 check('Skill template metadata and scope',skill_checks)
 def links_checks():
  broken=[]
- for p in ROOT.rglob('*.md'):
+ for p in distribution_md_files():
   for target in re.findall(r'\[[^\]]*\]\(([^)]+)\)',p.read_text()):
    target=target.split('#',1)[0]
    if not target or '://' in target or target.startswith('mailto:'):continue
@@ -186,7 +193,7 @@ def links_checks():
 check('Markdown local links',links_checks)
 def source_checks():
  sources=load('docs/sources.json');known={s['id'] for s in sources};bad=[]
- for p in ROOT.rglob('*.md'):
+ for p in distribution_md_files():
   # source IDs only; evaluation E/R/P/S cases not enclosed source markers in docs except real S01..S18
   if '/demo-data/' in str(p):continue
   for marker in re.findall(r'\[(S\d{2}|D\d{2})(?:[/\],])',p.read_text()):
@@ -194,7 +201,7 @@ def source_checks():
  expect(not bad,'Unknown source IDs '+str(bad));return f'{len(known)} source records, marker identifiers checked; relevance manually reviewed'
 check('Source marker registration',source_checks)
 def safety_checks():
- expect(not any(p.suffix.lower() in ('.ttf','.otf','.ttc','.woff','.woff2') for p in ROOT.rglob('*')),'Standalone font file in package')
+ expect(not any(p.suffix.lower() in ('.ttf','.otf','.ttc','.woff','.woff2') for p in distribution_files()),'Standalone font file in package')
  expect(not (ROOT/'.env').exists(),'Actual .env must not be distributed')
  cfg=load('config/codearts_cli.example.json')
  for x in cfg['provider'].values():expect(x['options']['apiKey']=='REPLACE_LOCALLY_ONLY','Unexpected key')

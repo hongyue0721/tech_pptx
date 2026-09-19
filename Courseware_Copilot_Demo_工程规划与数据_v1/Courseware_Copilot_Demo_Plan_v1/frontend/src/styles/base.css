@@ -1,0 +1,17 @@
+:root {
+  color-scheme: light;
+  --text: #1f2328;
+  --accent: #1a56c4;
+  --bg: #fafafa;
+}
+
+body {
+  margin: 0;
+  font-family: system-ui, "PingFang SC", "Microsoft YaHei", sans-serif;
+  color: var(--text);
+  background: var(--bg);
+}
+
+a {
+  color: var(--accent);
+}
