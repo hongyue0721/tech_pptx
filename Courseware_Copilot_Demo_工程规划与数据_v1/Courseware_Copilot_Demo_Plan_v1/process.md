@@ -1,6 +1,6 @@
 # process｜当前工程事实与交接
 
-版本：1.0.18；日期：2026-09-20；阶段：**M2 / T09-B 可信边界收口 + F00 只读接口完成（524 全绿，独立 Review 0 阻塞，待提交；R00+T09 已 push 至 6f58642）**。
+版本：1.0.18；日期：2026-09-20；阶段：**M2 / T09-B 可信边界收口 + F00 只读接口完成并分段提交 f41c8f6+0b36f77（524 全绿，独立 Review 0 阻塞；远端仍 6f58642，本轮未 push）**。
 
 ## 当前事实
 
@@ -33,7 +33,7 @@
 | 校内截止/命题参与数/书面认定 | OWNER_CONFIRMED | T00 负责人确认 |
 
 ## 当前任务
-**T09-B 可信边界收口 + F00 只读接口：五循环 TDD 完成（2026-09-20，基线 6f58642）**。收口 AGENT_00 Q01–Q08 与 F00：①独立可见文字审计（零 claim 不再绕门、豁免=教师计划 title 页、审计双射覆盖门、assumptions 入审、missing_evidence 非空保守 blocked、verdicts 严格双射）；②提案/存储类型隔离（模型不可写服务器权威来源字段、illustration refs 全走 locator、本批 allowed_chunk_ids 收紧、**OUTPUT_SCHEMAS 缺注册 ContentProposal 的真实生产路径 bug 修复**）；③教师确认顺序/布局保护（确定性重排+layout 门）；④候选写库前 guard_writable（取消/deadline/interrupted 落在写库窗口=零孤儿候选）；⑤F00 deck/evidence 只读接口+dev 启动装配（127.0.0.1）。pytest 478→**524 全绿**、validate_pack 23/23、独立 Review 0 阻塞（8 非阻塞：6 项当场闭环、N3/N4 进 backlog，详见 T09-B 行）。**下一步：提交本轮改动→进入阶段二前端 F1（三业务页面，ADR 替换旧两路由限制）**。T10 导出器选型仍待哥哥拍板；T09 遗留与 backlog 不变（semantic 自动修复循环、materials/commit 路由幂等锚点、generate_service 膨胀时外置门校验——本轮后该文件继续增长，已列入 Review 关注点）。仓库分支 master，已推送 6f58642（本轮 T09-B 改动未提交未 push）。
+**T09-B 可信边界收口 + F00 只读接口：五循环 TDD 完成（2026-09-20，基线 6f58642）**。收口 AGENT_00 Q01–Q08 与 F00：①独立可见文字审计（零 claim 不再绕门、豁免=教师计划 title 页、审计双射覆盖门、assumptions 入审、missing_evidence 非空保守 blocked、verdicts 严格双射）；②提案/存储类型隔离（模型不可写服务器权威来源字段、illustration refs 全走 locator、本批 allowed_chunk_ids 收紧、**OUTPUT_SCHEMAS 缺注册 ContentProposal 的真实生产路径 bug 修复**）；③教师确认顺序/布局保护（确定性重排+layout 门）；④候选写库前 guard_writable（取消/deadline/interrupted 落在写库窗口=零孤儿候选）；⑤F00 deck/evidence 只读接口+dev 启动装配（127.0.0.1）。pytest 478→**524 全绿**、validate_pack 23/23、独立 Review 0 阻塞（8 非阻塞：6 项当场闭环、N3/N4 进 backlog，详见 T09-B 行）；已分段提交 f41c8f6+0b36f77+文档段，未 push。**下一步：进入阶段二前端 F1（三业务页面，ADR 替换旧两路由限制）**。T10 导出器选型仍待哥哥拍板；T09 遗留与 backlog 不变（semantic 自动修复循环、materials/commit 路由幂等锚点、generate_service 膨胀时外置门校验——本轮后该文件继续增长，已列入 Review 关注点）。仓库分支 master，已推送 6f58642；本轮 T09-B 已提交 f41c8f6+0b36f77+文档段（未 push，push 须哥哥授权）。
 
 ## 新增阻塞（负责人决断）
 

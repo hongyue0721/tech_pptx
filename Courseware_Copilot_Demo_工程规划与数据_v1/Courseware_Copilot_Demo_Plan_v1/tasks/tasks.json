@@ -353,7 +353,7 @@
     "constraints": "可信门不得放宽；APP_LIVE=NOT_RUN不以Fake数字补证据；missing_evidence保守策略修改须先写ADR",
     "owner": "鸿岳（单人主开发）",
     "evidence": [
-      "基线 commit 6f58642；本轮改动待提交",
+      "已分段提交 f41c8f6（可信门）+ 0b36f77（F00/dev）+ 文档真值段；未 push",
       "pytest 524 passed（478→524，净增46，逐循环先红后绿）",
       "validate_pack 23/23",
       "契约同步：models.schema.json+openapi.json+samples（ProposalSlide/ProposalSlideBlock/ProposalIllustrationBlock/VisibleTextAudit）+api.md（EVIDENCE_NOT_FOUND 404、deck version<1→404 语义）",
