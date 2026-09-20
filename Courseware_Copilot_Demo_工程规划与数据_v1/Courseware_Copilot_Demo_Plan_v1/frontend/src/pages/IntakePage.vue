@@ -1,21 +1,41 @@
 <script setup lang="ts">
 import { AButton, AInput, ATextarea } from "@any-design/anyui/vue";
 import { computed, onBeforeUnmount, ref, watch } from "vue";
-import { useRoute, useRouter } from "vue-router";
+import { useRouter } from "vue-router";
 
-import { ApiError, api } from "../api/client";
-import { materialsApi } from "../api/resources";
+import { api } from "../api/client";
+import { describeError } from "../api/errorMessages";
+import { canonicalize, createProjectKey } from "../api/idempotency";
 import StatusTag from "../components/common/StatusTag.vue";
-import type { CreateProjectRequest, Material, Project } from "../types/models";
+import { MAX_MATERIALS, useMaterialIntake } from "../composables/useMaterialIntake";
+import type { CreateProjectRequest, Project } from "../types/models";
 import CourseShell from "../layouts/CourseShell.vue";
 
 const props = defineProps<{ id?: string }>();
 const router = useRouter();
-const route = useRoute();
 
 const project = ref<Project | null>(null);
 const loadError = ref("");
 let controller: AbortController | null = null;
+let loadEpoch = 0;
+
+const intake = useMaterialIntake(computed(() => props.id ?? null));
+const {
+  queue,
+  materials,
+  materialsError,
+  uploading,
+  generating,
+  jobNotice,
+  job,
+  pollError,
+  isPolling,
+  readyCount,
+  failedCount,
+  allReady,
+  busy,
+  canGenerateOutline,
+} = intake;
 
 // 创建前表单（真实提交，校验与后端一致：topic/audience 必填、goals≤8、页数4-12）
 const topic = ref("");
@@ -27,16 +47,6 @@ const consent = ref(false);
 const submitting = ref(false);
 const formError = ref("");
 
-// 本地待提交队列：创建项目前可增删；创建后逐份上传（F2 接通）。
-interface QueuedFile {
-  name: string;
-  size: number;
-  file: File;
-}
-const queue = ref<QueuedFile[]>([]);
-const materials = ref<Material[]>([]);
-const materialsError = ref("");
-
 const isCreateMode = computed(() => !props.id);
 const goals = computed(() =>
   goalsText.value
@@ -44,25 +54,19 @@ const goals = computed(() =>
     .map((line) => line.trim())
     .filter((line) => line.length > 0),
 );
-const readyCount = computed(() => materials.value.filter((m) => m.status === "ready").length);
-const allReady = computed(
-  () => materials.value.length > 0 && readyCount.value === materials.value.length,
-);
-const canGenerateOutline = computed(() => allReady.value && !project.value?.active_job_id);
+const totalMaterialCount = computed(() => materials.value.length + queue.value.length);
+const queueFull = computed(() => totalMaterialCount.value >= MAX_MATERIALS);
 
 function onPickFiles(event: Event): void {
   const input = event.target as HTMLInputElement;
   const files = Array.from(input.files ?? []);
-  for (const file of files) {
-    if (!file.name.toLowerCase().endsWith(".pdf")) continue;
-    if (queue.value.some((q) => q.name === file.name && q.size === file.size)) continue;
-    queue.value.push({ name: file.name, size: file.size, file });
-  }
   input.value = "";
-}
-
-function removeQueued(index: number): void {
-  queue.value.splice(index, 1);
+  if (queueFull.value && !isCreateMode.value) {
+    materialsError.value = `最多 ${MAX_MATERIALS} 份资料，请先删除旧资料或新建课题。`;
+    return;
+  }
+  intake.enqueueFiles(files);
+  if (!isCreateMode.value) void intake.runUploadLoop();
 }
 
 async function createAndUpload(): Promise<void> {
@@ -79,11 +83,11 @@ async function createAndUpload(): Promise<void> {
     consent_to_cloud_processing: consent.value,
   };
   try {
-    const created = await api.createProject(body, crypto.randomUUID());
+    // 键由表单内容派生：结果未知（网络失败）重试同一表单时不换键，命中幂等恢复。
+    const created = await api.createProject(body, createProjectKey(canonicalize(body)));
     await router.push({ name: "materials", params: { id: created.id } });
   } catch (err) {
-    formError.value =
-      err instanceof ApiError ? `${err.message}（${err.code}）` : String(err);
+    formError.value = describeError(err).message;
   } finally {
     submitting.value = false;
   }
@@ -95,28 +99,13 @@ async function loadProject(projectId: string, epoch: number): Promise<void> {
   loadError.value = "";
   try {
     const loaded = await api.getProject(projectId, controller.signal);
-    if (route.name !== "materials" && route.name !== "intake") return;
     if (epoch !== loadEpoch) return;
     project.value = loaded;
-    await loadMaterials(projectId, epoch);
+    await intake.restoreJob(loaded.active_job_id);
   } catch (err) {
     if (err instanceof DOMException && err.name === "AbortError") return;
     if (epoch !== loadEpoch) return;
-    loadError.value = err instanceof ApiError ? err.message : String(err);
-  }
-}
-
-let loadEpoch = 0;
-
-async function loadMaterials(projectId: string, epoch: number): Promise<void> {
-  try {
-    const list = await materialsApi.list(projectId);
-    if (epoch !== loadEpoch) return;
-    materials.value = list.materials;
-    materialsError.value = "";
-  } catch (err) {
-    if (epoch !== loadEpoch) return;
-    materialsError.value = err instanceof ApiError ? err.message : String(err);
+    loadError.value = describeError(err).message;
   }
 }
 
@@ -126,7 +115,6 @@ watch(
     loadEpoch += 1;
     if (!id) {
       project.value = null;
-      materials.value = [];
       return;
     }
     void loadProject(id, loadEpoch);
@@ -136,17 +124,42 @@ watch(
 
 onBeforeUnmount(() => controller?.abort());
 
+const queueStateText: Record<string, string> = {
+  pending: "待提交",
+  uploading: "上传中",
+  parsing: "解析中",
+  done: "已入库",
+  failed: "失败",
+};
+
 const statusText = computed(() => {
   if (isCreateMode.value) {
     return queue.value.length > 0
-      ? `待提交资料 ${queue.value.length} 份，创建后自动解析`
-      : "创建课题后可上传教学资料";
+      ? `待提交资料 ${queue.value.length} 份，创建后自动逐份上传解析`
+      : "创建课题后逐份上传教学资料";
   }
   if (loadError.value) return "项目读取失败，请刷新重试";
+  if (uploading.value) return "正在逐份上传资料（等待解析任务释放写锁）";
+  if (isPolling.value && job.value?.kind === "parse") return `资料解析中：${job.value.stage}`;
+  if (isPolling.value && job.value?.kind === "plan") return "教学大纲生成中，请稍候…";
+  if (pollError.value && isPolling.value) return "任务状态读取失败，正在自动重试（不会重复提交）";
   if (materials.value.length === 0) return "尚未上传教学资料";
-  const failed = materials.value.filter((m) => m.status === "failed").length;
-  if (failed > 0) return `${readyCount.value} 份就绪，${failed} 份解析失败`;
-  return `${readyCount.value} 份资料文本就绪`;
+  if (failedCount.value > 0) return `${readyCount.value} 份就绪，${failedCount.value} 份解析失败`;
+  if (allReady.value) return `${readyCount.value} 份资料文本就绪`;
+  return "资料尚未全部就绪";
+});
+
+const footerError = computed(() => {
+  if (loadError.value) return loadError.value;
+  if (jobNotice.value) return jobNotice.value;
+  if (materialsError.value) return materialsError.value;
+  return "";
+});
+
+const generateTitle = computed(() => {
+  if (busy.value) return "当前任务处理中，请等待完成";
+  if (!allReady.value) return "资料尚未全部就绪";
+  return "";
 });
 </script>
 
@@ -199,24 +212,32 @@ const statusText = computed(() => {
       <section class="panel materials-panel" aria-labelledby="mat-title">
         <div class="materials-head">
           <h2 id="mat-title" class="panel-title">教学资料</h2>
-          <span class="count">{{ isCreateMode ? queue.length : materials.length }} / 5</span>
+          <span class="count">{{ isCreateMode ? queue.length : totalMaterialCount }} / {{ MAX_MATERIALS }}</span>
         </div>
-        <label class="drop-zone" :class="{ disabled: !isCreateMode }">
+        <label class="drop-zone">
           <input type="file" accept="application/pdf" multiple hidden @change="onPickFiles" />
-          <strong>{{ isCreateMode ? "拖入 PDF 或点击选择（先入队列）" : "上传入口将在资料链路接通后启用" }}</strong>
-          <span class="drop-hint">PDF · 单份 ≤20MiB · 最多 5 份 · 逐份解析</span>
+          <strong>{{ isCreateMode ? "拖入 PDF 或点击选择（先入队列）" : "拖入 PDF 或点击选择（逐份上传解析）" }}</strong>
+          <span class="drop-hint">PDF · 单份 ≤20MiB · 最多 {{ MAX_MATERIALS }} 份 · 逐份解析</span>
         </label>
-        <ul v-if="isCreateMode" class="file-list">
+        <ul v-if="queue.length" class="file-list" aria-live="polite">
           <li v-for="(q, i) in queue" :key="`${q.name}-${i}`">
             <span class="file-name">{{ q.name }}</span>
-            <StatusTag tone="info">待提交</StatusTag>
-            <button class="link-btn" type="button" @click="removeQueued(i)">移除</button>
+            <StatusTag
+              :tone="q.state === 'done' ? 'ready' : q.state === 'failed' ? 'failed' : q.state === 'pending' ? 'info' : 'pending'"
+            >{{ queueStateText[q.state] }}</StatusTag>
+            <span v-if="q.error" class="error">{{ q.error }}</span>
+            <button
+              v-if="q.state === 'pending' || q.state === 'failed'"
+              class="link-btn"
+              type="button"
+              @click="intake.removeQueued(i)"
+            >移除</button>
           </li>
         </ul>
-        <ul v-else class="file-list" aria-live="polite">
-          <li v-if="materialsError" class="error">{{ materialsError }}</li>
+        <ul v-if="!isCreateMode" class="file-list server-list" aria-live="polite">
           <li v-for="m in materials" :key="m.id">
             <span class="file-name">{{ m.original_name }}</span>
+            <span class="page-count">{{ m.pdf_pages ?? "—" }} 页 · 可用 {{ m.usable_pages ?? "—" }}</span>
             <StatusTag v-if="m.status === 'ready'" tone="ready">文本就绪</StatusTag>
             <StatusTag v-else-if="m.status === 'failed'" tone="failed">解析失败</StatusTag>
             <StatusTag v-else tone="pending">解析中</StatusTag>
@@ -225,7 +246,7 @@ const statusText = computed(() => {
               <ul><li v-for="w in m.warnings" :key="w.pdf_page">第 {{ w.pdf_page }} 页：{{ w.message }}</li></ul>
             </details>
           </li>
-          <li v-if="materials.length === 0 && !materialsError" class="empty-hint">
+          <li v-if="materials.length === 0 && queue.length === 0" class="empty-hint">
             尚未上传资料。可先创建课题，再逐份上传解析。
           </li>
         </ul>
@@ -234,7 +255,7 @@ const statusText = computed(() => {
     </div>
 
     <template #footer-status>
-      <span :class="{ 'error-text': Boolean(loadError) }">{{ statusText }}</span>
+      <span :class="{ 'error-text': Boolean(footerError) }">{{ footerError || statusText }}</span>
     </template>
     <template #footer-actions>
       <template v-if="isCreateMode">
@@ -250,10 +271,10 @@ const statusText = computed(() => {
         <AButton
           type="primary"
           :disabled="!canGenerateOutline"
-          :title="canGenerateOutline ? '' : '资料尚未全部就绪'"
-          @click="() => {}"
+          :title="generateTitle"
+          @click="intake.generateOutline()"
         >
-          生成教学大纲 →
+          {{ generating ? "大纲生成中…" : "生成教学大纲 →" }}
         </AButton>
       </template>
     </template>
@@ -366,10 +387,6 @@ const statusText = computed(() => {
   background: var(--cc-selected);
   text-align: center;
 }
-.drop-zone.disabled {
-  cursor: default;
-  opacity: 0.75;
-}
 .drop-hint {
   font-size: var(--cc-font-aux);
   color: var(--cc-ink-weak);
@@ -383,6 +400,9 @@ const statusText = computed(() => {
   max-height: 200px;
   overflow: auto;
 }
+.server-list {
+  max-height: 260px;
+}
 .file-list li {
   display: flex;
   align-items: center;
@@ -390,6 +410,7 @@ const statusText = computed(() => {
   padding: 8px 10px;
   border: 1px solid var(--cc-border);
   border-radius: var(--cc-radius-control);
+  flex-wrap: wrap;
 }
 .file-name {
   flex: 1;
@@ -397,6 +418,10 @@ const statusText = computed(() => {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+.page-count {
+  font-size: var(--cc-font-aux);
+  color: var(--cc-ink-weak);
 }
 .link-btn {
   background: none;

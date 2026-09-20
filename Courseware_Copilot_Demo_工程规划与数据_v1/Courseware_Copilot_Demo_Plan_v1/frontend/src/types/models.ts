@@ -97,8 +97,8 @@ export interface Material {
   original_name: string;
   sha256: string;
   status: "queued" | "parsing" | "ready" | "failed";
-  pdf_pages: number;
-  usable_pages: number;
+  pdf_pages: number | null;
+  usable_pages: number | null;
   corpus_revision: number;
   warnings: PageWarning[];
   error_code: string | null;

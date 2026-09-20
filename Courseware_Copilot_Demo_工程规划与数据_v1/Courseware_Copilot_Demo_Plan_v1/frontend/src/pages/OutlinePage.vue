@@ -3,11 +3,12 @@ import { AButton } from "@any-design/anyui/vue";
 import { computed, onBeforeUnmount, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 
-import { ApiError } from "../api/client";
+import { api } from "../api/client";
+import { describeError } from "../api/errorMessages";
 import { plansApi } from "../api/resources";
 import StatusTag from "../components/common/StatusTag.vue";
+import { useOutlineFlow } from "../composables/useOutlineFlow";
 import CourseShell from "../layouts/CourseShell.vue";
-import { api } from "../api/client";
 import type { LessonPlan, PlanSlide, Project } from "../types/models";
 
 const props = defineProps<{ id: string }>();
@@ -23,10 +24,21 @@ let epoch = 0;
 
 const planId = computed(() => (route.query.plan as string | undefined) ?? "");
 const goalsOpen = ref(false);
-const selectedSlide = computed<PlanSlide | null>(
-  () => plan.value?.slides[selectedIndex.value] ?? null,
+
+const flow = useOutlineFlow(
+  computed(() => props.id),
+  plan,
+  project,
 );
-const isConfirmed = computed(() => plan.value?.status === "confirmed");
+const {
+  editedSlides, acceptedGoals, reviewed, confirming, generating, flowError, job, pollError, isPolling,
+  isConfirmed, isStale, readOnly,
+  goalAcceptable, isGoalAccepted, toggleGoal,
+} = flow;
+
+const selectedSlide = computed<PlanSlide | null>(
+  () => editedSlides.value[selectedIndex.value] ?? null,
+);
 
 const COVERAGE_LABEL: Record<string, string> = {
   supported: "相关资料较充分（检索）",
@@ -53,10 +65,13 @@ async function load(): Promise<void> {
     if (myEpoch !== epoch) return;
     project.value = p;
     plan.value = pl;
+    flow.resetFromPlan(pl);
+    selectedIndex.value = 0;
+    flow.restoreJob();
   } catch (err) {
     if (err instanceof DOMException && err.name === "AbortError") return;
     if (myEpoch !== epoch) return;
-    loadError.value = err instanceof ApiError ? err.message : String(err);
+    loadError.value = describeError(err).message;
     plan.value = null;
   }
 }
@@ -65,18 +80,45 @@ watch([() => props.id, planId], () => void load(), { immediate: true });
 onBeforeUnmount(() => controller?.abort());
 
 function move(index: number, delta: number): void {
-  if (!plan.value) return;
-  const target = index + delta;
-  if (target < 0 || target >= plan.value.slides.length) return;
-  const slides = [...plan.value.slides];
-  [slides[index], slides[target]] = [slides[target], slides[index]];
-  plan.value = { ...plan.value, slides };
-  selectedIndex.value = target;
+  if (readOnly.value) return;
+  flow.moveSlide(index, delta);
+  if (index + delta >= 0 && index + delta < editedSlides.value.length) {
+    selectedIndex.value = index + delta;
+  }
 }
 
 function goMaterials(): void {
   void router.push({ name: "materials", params: { id: props.id } });
 }
+
+const footerStatus = computed(() => {
+  if (isPolling.value && job.value?.kind === "generate") {
+    return `课件生成中：${job.value.stage}（候选不会直接改正式版本）`;
+  }
+  if (pollError.value) return "任务状态读取失败，正在自动重试（不会重复提交）";
+  if (flowError.value) return flowError.value;
+  return "";
+});
+
+const primaryActionText = computed(() => {
+  if (confirming.value) return "确认中…";
+  if (generating.value || isPolling.value) return "生成中…";
+  if (isConfirmed.value) return "生成课件 →";
+  return "确认大纲并生成 →";
+});
+
+const primaryDisabled = computed(
+  () => !(flow.canConfirmAndGenerate.value || flow.canGenerateOnly.value),
+);
+
+const primaryTitle = computed(() => {
+  if (isStale.value) return "资料已更新，请返回资料页重新生成大纲";
+  if (flow.busy.value) return "当前任务处理中，请等待完成";
+  if (!plan.value) return "等待大纲";
+  if (!isConfirmed.value && !reviewed.value) return "请先勾选“我已逐页审阅大纲”";
+  if (!isConfirmed.value && acceptedGoals.value.length === 0) return "请至少接受一个教学目标";
+  return "";
+});
 </script>
 
 <template>
@@ -103,23 +145,28 @@ function goMaterials(): void {
         </div>
         <ul class="goal-list">
           <li v-for="c in plan.coverage" :key="c.goal_index">
-            <span class="goal-mark" :class="`m-${c.status}`" aria-hidden="true">
-              {{ c.status === "supported" ? "☑" : c.status === "partial" ? "△" : "□" }}
-            </span>
+            <label class="goal-check" :title="goalAcceptable(c.goal_index) ? '' : '缺口/冲突目标不可接受'">
+              <input
+                type="checkbox"
+                :checked="isGoalAccepted(c.goal_index)"
+                :disabled="readOnly || !goalAcceptable(c.goal_index)"
+                @change="toggleGoal(c.goal_index, ($event.target as HTMLInputElement).checked)"
+              />
+            </label>
             <div>
               <p class="goal-text">目标{{ c.goal_index + 1 }}：{{ project?.course.goals[c.goal_index] }}</p>
               <p class="goal-cov">{{ COVERAGE_LABEL[c.status] }}<template v-if="c.note"> · {{ c.note }}</template></p>
             </div>
           </li>
         </ul>
-        <p class="coverage-note">覆盖状态是资料检索覆盖，不等于事实已验证。</p>
+        <p class="coverage-note">勾选即接受范围；覆盖状态是资料检索覆盖，不等于事实已验证。缺口目标须补资料后重新生成。</p>
       </section>
 
       <section class="panel list-panel" aria-label="大纲页面列表">
-        <h2 class="panel-title">本次教学大纲 · {{ plan.slides.length }} 页</h2>
+        <h2 class="panel-title">本次教学大纲 · {{ editedSlides.length }} 页</h2>
         <ol class="slide-list">
           <li
-            v-for="(s, i) in plan.slides"
+            v-for="(s, i) in editedSlides"
             :key="s.id"
             :class="{ selected: i === selectedIndex }"
           >
@@ -141,7 +188,7 @@ function goMaterials(): void {
               v-model="selectedSlide.title"
               class="text-input"
               maxlength="40"
-              :disabled="isConfirmed"
+              :disabled="readOnly"
             />
           </label>
           <label class="field">
@@ -151,7 +198,7 @@ function goMaterials(): void {
               class="text-input"
               rows="3"
               maxlength="240"
-              :disabled="isConfirmed"
+              :disabled="readOnly"
             ></textarea>
           </label>
           <p class="meta-line">
@@ -160,10 +207,10 @@ function goMaterials(): void {
             关联目标 {{ selectedSlide.goal_indices.map((g) => g + 1).join("、") || "无" }}
           </p>
           <div class="move-row">
-            <AButton size="small" :disabled="isConfirmed || selectedIndex === 0" @click="move(selectedIndex, -1)">上移</AButton>
+            <AButton size="small" :disabled="readOnly || selectedIndex === 0" @click="move(selectedIndex, -1)">上移</AButton>
             <AButton
               size="small"
-              :disabled="isConfirmed || selectedIndex >= (plan?.slides.length ?? 0) - 1"
+              :disabled="readOnly || selectedIndex >= editedSlides.length - 1"
               @click="move(selectedIndex, 1)"
             >下移</AButton>
           </div>
@@ -173,24 +220,30 @@ function goMaterials(): void {
     <div v-else class="empty-state"><p>加载中…</p></div>
 
     <template #footer-status>
-      <span v-if="plan">
+      <span v-if="footerStatus" class="error-text">{{ footerStatus }}</span>
+      <span v-else-if="plan">
         <StatusTag v-if="isConfirmed" tone="ready">大纲已确认</StatusTag>
+        <StatusTag v-else-if="isStale" tone="failed">大纲已过期（资料已更新）</StatusTag>
         <StatusTag v-else-if="plan.status === 'needs_material'" tone="pending">存在资料缺口</StatusTag>
         <StatusTag v-else tone="info">草稿 · 待教师确认</StatusTag>
-        · 已选范围 {{ plan.accepted_goal_indices.length }} 个目标
+        · 接受范围 {{ acceptedGoals.length }} 个目标
       </span>
       <span v-else>等待大纲</span>
     </template>
     <template #footer-actions>
       <AButton class="narrow-only" @click="goalsOpen = !goalsOpen">目标</AButton>
+      <label v-if="!isConfirmed && !isStale && plan" class="review-check">
+        <input v-model="reviewed" type="checkbox" />
+        <span>我已逐页审阅大纲</span>
+      </label>
       <AButton :disabled="!plan" @click="goMaterials">返回资料</AButton>
       <AButton
         type="primary"
-        :disabled="!plan || isConfirmed"
-        :title="plan && !isConfirmed ? '确认后进入课件生成（F2 接通执行）' : ''"
-        @click="() => {}"
+        :disabled="primaryDisabled"
+        :title="primaryTitle"
+        @click="flow.confirmAndGenerate()"
       >
-        确认大纲并生成 →
+        {{ primaryActionText }}
       </AButton>
     </template>
   </CourseShell>
@@ -227,16 +280,17 @@ function goMaterials(): void {
   display: flex;
   gap: 8px;
 }
-.goal-mark {
-  color: var(--cc-ink-weak);
-  font-size: 15px;
-  line-height: 1.4;
+.goal-check {
+  display: flex;
+  align-items: flex-start;
+  padding-top: 2px;
 }
-.m-supported {
-  color: var(--cc-success);
+.goal-check input {
+  accent-color: var(--cc-primary);
+  cursor: pointer;
 }
-.m-partial {
-  color: var(--cc-blocked);
+.goal-check input:disabled {
+  cursor: not-allowed;
 }
 .goal-text {
   margin: 0;
@@ -344,6 +398,17 @@ function goMaterials(): void {
 }
 .narrow-only {
   display: none;
+}
+.review-check {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--cc-font-aux);
+  color: var(--cc-ink-weak);
+  white-space: nowrap;
+}
+.review-check input {
+  accent-color: var(--cc-primary);
 }
 .goals-head {
   display: flex;
