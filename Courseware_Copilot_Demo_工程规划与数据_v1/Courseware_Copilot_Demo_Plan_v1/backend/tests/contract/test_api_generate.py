@@ -9,7 +9,13 @@ import pytest
 from fastapi.testclient import TestClient
 
 from courseware_core.llm.adapter import TypedCompletion, Usage
-from courseware_core.models import ContentProposal, Job, PlanProposal, SemanticVerdicts
+from courseware_core.models import (
+    ContentProposal,
+    Job,
+    PlanProposal,
+    SemanticVerdicts,
+    VisibleTextAudit,
+)
 from courseware_core.storage.database import connect
 
 CHUNK1_TEXT = "讲解：NVIC优先级分组通过AIRCR配置，需要先解锁KEYR。"
@@ -93,6 +99,12 @@ def verdicts_supported() -> SemanticVerdicts:
             "checks": [{"claim_id": "clm1", "status": "supported", "reason": "原文支持。"}],
             "unbound_assertions": [],
         }
+    )
+
+
+def audit_pass_ps1() -> VisibleTextAudit:
+    return VisibleTextAudit.model_validate(
+        {"audited_slide_ids": ["ps1"], "unbound_assertions": []}
     )
 
 
@@ -298,6 +310,7 @@ class TestGenerateEndToEnd:
         provider = StageProvider(plan_proposal())
         provider.queue("generate_content", [content_proposal()])
         provider.queue("verify_claims", [verdicts_supported()])
+        provider.queue("audit_visible_text", [audit_pass_ps1()])
 
         def plan_handler(job: Job):
             from courseware_core.services.plan_service import PlanService
@@ -372,6 +385,7 @@ class TestGenerateEndToEnd:
             assert "plan_course" in provider.calls
             assert provider.calls.count("generate_content") == 1
             assert provider.calls.count("verify_claims") == 1
+            assert provider.calls.count("audit_visible_text") == 1
 
 
 def seed_chunks_direct(conn, project_id):
@@ -448,6 +462,7 @@ class TestCommitRoute:
         provider = StageProvider(plan_proposal())
         provider.queue("generate_content", [content_proposal()])
         provider.queue("verify_claims", [verdicts_supported()])
+        provider.queue("audit_visible_text", [audit_pass_ps1()])
         ref = GenerateService(conn, provider=provider).handle_generate(job)
         return client, conn, pid, ref.id
 
@@ -551,6 +566,7 @@ class TestCommitRoute:
                              "reason": "材料互斥。"}], "unbound_assertions": []}
             )
             provider.queue("verify_claims", [bad])
+            provider.queue("audit_visible_text", [audit_pass_ps1()])
             ref = GenerateService(conn, provider=provider).handle_generate(job)
             r = client.post(
                 f"/api/v1/projects/{pid}/changes/{ref.id}/commit",

@@ -59,8 +59,12 @@ from .proposals import (
     CoverageNote,
     EditProposal,
     PlanProposal,
+    ProposalIllustrationBlock,
+    ProposalSlide,
+    ProposalSlideBlock,
     SemanticCheck,
     SemanticVerdicts,
+    VisibleTextAudit,
 )
 
 __all__ = [
@@ -120,6 +124,10 @@ __all__ = [
     "CoverageNote",
     "EditProposal",
     "PlanProposal",
+    "ProposalIllustrationBlock",
+    "ProposalSlide",
+    "ProposalSlideBlock",
     "SemanticCheck",
     "SemanticVerdicts",
+    "VisibleTextAudit",
 ]

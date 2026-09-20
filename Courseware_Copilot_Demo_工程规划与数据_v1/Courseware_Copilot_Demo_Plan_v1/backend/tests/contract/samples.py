@@ -176,6 +176,43 @@ SAMPLES: dict[str, list[dict]] = {
         },
     ],
     "Slide": [SLIDE],
+    "ProposalIllustrationBlock": [
+        {
+            "type": "illustration",
+            "text": "把抢占优先级想象成打断了说话。",
+            "assumptions": ["学生熟悉课堂打断场景"],
+            "evidence_refs": [{"chunk_id": "chk_001", "quote": "NVIC 优先级分组"}],
+        }
+    ],
+    "ProposalSlideBlock": [
+        {"type": "fact", "claim_id": "clm_001"},
+        {"type": "teaching", "text": "先分组再设数值。"},
+        {
+            "type": "illustration",
+            "text": "打断的比喻。",
+            "assumptions": ["课堂场景"],
+            "evidence_refs": [],
+        },
+    ],
+    "ProposalSlide": [
+        {
+            "id": "sld_001",
+            "title": "NVIC 优先级分组",
+            "layout": "concept",
+            "blocks": [
+                {"type": "fact", "claim_id": "clm_001"},
+                {
+                    "type": "illustration",
+                    "text": "打断的比喻。",
+                    "assumptions": ["课堂场景"],
+                    "evidence_refs": [{"chunk_id": "chk_001", "quote": "NVIC 优先级分组"}],
+                },
+            ],
+        }
+    ],
+    "VisibleTextAudit": [
+        {"audited_slide_ids": ["sld_001"], "unbound_assertions": []}
+    ],
     "DeckSpec": [DECK_SPEC],
     "ObjectiveCoverage": [
         {

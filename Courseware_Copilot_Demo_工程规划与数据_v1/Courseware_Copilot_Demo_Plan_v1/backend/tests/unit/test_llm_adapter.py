@@ -25,7 +25,7 @@ from courseware_core.errors import (
 from courseware_core.llm.adapter import ChatCompletionsAdapter, TypedCompletion
 from courseware_core.llm.budget import CallBudget, JobContext
 from courseware_core.llm.config import LLMConfig
-from courseware_core.models import PlanProposal, SemanticVerdicts
+from courseware_core.models import ContentProposal, PlanProposal, SemanticVerdicts
 
 PLAN_PROPOSAL_JSON = {
     "slides": [
@@ -45,6 +45,27 @@ PLAN_PROPOSAL_JSON = {
 
 VERDICTS_JSON = {
     "checks": [{"claim_id": "c1", "status": "supported", "reason": "证据直接支持"}]
+}
+
+CONTENT_PROPOSAL_JSON = {
+    "claims": [
+        {
+            "id": "clm1",
+            "text": "NVIC 分组决定位数分配。",
+            "kind": "direct",
+            "evidence_refs": [{"chunk_id": "c1", "quote": "NVIC 优先级分组"}],
+            "rationale": None,
+        }
+    ],
+    "slides": [
+        {
+            "id": "ps1",
+            "title": "NVIC分组",
+            "layout": "concept",
+            "blocks": [{"type": "fact", "claim_id": "clm1"}],
+        }
+    ],
+    "missing_evidence": [],
 }
 
 MESSAGES = [
@@ -175,6 +196,16 @@ class TestProtocolShape:
         adapter, _, _ = make_adapter([chat_response(json.dumps(VERDICTS_JSON))])
         completion = adapter.complete_json("verify_claims", "SemanticVerdicts", MESSAGES, make_context())
         assert isinstance(completion.value, SemanticVerdicts)
+
+    def test_content_proposal_schema_registered(self):
+        # 真实 adapter 路径（非 ScriptedProvider）必须能解析 generate_content：
+        # 注册表缺 ContentProposal 时 T09 生产链路必抛 unknown schema，
+        # 此前被 Fake provider 绕过而不可见。
+        adapter, _, _ = make_adapter([chat_response(json.dumps(CONTENT_PROPOSAL_JSON))])
+        completion = adapter.complete_json(
+            "generate_content", "ContentProposal", MESSAGES, make_context()
+        )
+        assert isinstance(completion.value, ContentProposal)
 
 
 class TestJsonRepair:

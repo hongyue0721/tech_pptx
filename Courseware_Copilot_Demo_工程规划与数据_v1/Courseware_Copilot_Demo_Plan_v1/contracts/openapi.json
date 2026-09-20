@@ -4183,7 +4183,7 @@
           "slides": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/Slide"
+              "$ref": "#/components/schemas/ProposalSlide"
             },
             "minItems": 1,
             "maxItems": 16
@@ -4383,6 +4383,154 @@
           "field_path",
           "text",
           "reason"
+        ],
+        "additionalProperties": false
+      },
+      "ProposalIllustrationBlock": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "const": "illustration"
+          },
+          "text": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 240
+          },
+          "assumptions": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            },
+            "minItems": 1,
+            "maxItems": 6
+          },
+          "evidence_refs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EvidenceProposal"
+            },
+            "minItems": 0,
+            "maxItems": 5
+          }
+        },
+        "required": [
+          "type",
+          "text",
+          "assumptions",
+          "evidence_refs"
+        ],
+        "additionalProperties": false
+      },
+      "ProposalSlideBlock": {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "const": "fact"
+              },
+              "claim_id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128
+              }
+            },
+            "required": [
+              "type",
+              "claim_id"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "const": "teaching"
+              },
+              "text": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200
+              }
+            },
+            "required": [
+              "type",
+              "text"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "$ref": "#/components/schemas/ProposalIllustrationBlock"
+          }
+        ]
+      },
+      "ProposalSlide": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 40
+          },
+          "layout": {
+            "type": "string",
+            "enum": [
+              "title",
+              "concept",
+              "two_column",
+              "process_example"
+            ]
+          },
+          "blocks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProposalSlideBlock"
+            },
+            "minItems": 1,
+            "maxItems": 6
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "layout",
+          "blocks"
+        ],
+        "additionalProperties": false
+      },
+      "VisibleTextAudit": {
+        "type": "object",
+        "properties": {
+          "audited_slide_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "minItems": 0,
+            "maxItems": 16
+          },
+          "unbound_assertions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UnboundAssertion"
+            },
+            "minItems": 0,
+            "maxItems": 64
+          }
+        },
+        "required": [
+          "audited_slide_ids",
+          "unbound_assertions"
         ],
         "additionalProperties": false
       }

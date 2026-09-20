@@ -33,7 +33,12 @@ from courseware_core.errors import (
     ModelUnavailable,
     ValidationFailed,
 )
-from courseware_core.models import PlanProposal, SemanticVerdicts
+from courseware_core.models import (
+    ContentProposal,
+    PlanProposal,
+    SemanticVerdicts,
+    VisibleTextAudit,
+)
 
 from .budget import BudgetExceededError, CancelledError, DeadlineExceededError, JobContext
 from .config import RETRY_AFTER_CAP_SECONDS, TRANSIENT_BACKOFF_SECONDS, LLMConfig
@@ -41,7 +46,9 @@ from .config import RETRY_AFTER_CAP_SECONDS, TRANSIENT_BACKOFF_SECONDS, LLMConfi
 # 模型输出提案Schema注册表：模型只填提案类型，存储/HTTP类型不进此表（docs/18）。
 OUTPUT_SCHEMAS = {
     "PlanProposal": PlanProposal,
+    "ContentProposal": ContentProposal,
     "SemanticVerdicts": SemanticVerdicts,
+    "VisibleTextAudit": VisibleTextAudit,
 }
 
 TEMPORARY_STATUS_CODES = {429, 500, 502, 503, 504}

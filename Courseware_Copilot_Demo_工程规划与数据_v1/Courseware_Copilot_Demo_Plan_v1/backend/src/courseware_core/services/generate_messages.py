@@ -41,6 +41,17 @@ def content_messages(
     return [{"role": "system", "content": system}, {"role": "user", "content": user}]
 
 
+def _slide_visible_texts(s: Slide) -> list[str]:
+    """页面全部可见文字：标题 + 各块 text + illustration 假设（审计输入唯一装配）。"""
+    texts = [s.title]
+    for idx, b in enumerate(s.blocks):
+        if hasattr(b, "text"):
+            texts.append(f"blocks[{idx}].text={b.text}")
+        for a_idx, assumption in enumerate(getattr(b, "assumptions", []) or []):
+            texts.append(f"blocks[{idx}].assumptions[{a_idx}]={assumption}")
+    return texts
+
+
 def verify_messages(
     located: list[Claim],
     batch_slides: list[Slide],
@@ -57,12 +68,38 @@ def verify_messages(
         claims_block.append(f"【claim {c.id}】({c.kind}) {c.text}\n{refs}")
     visible = []
     for s in batch_slides:
-        texts = [s.title] + [b.text for b in s.blocks if hasattr(b, "text")]
-        visible.append(f"- {s.id}：" + " / ".join(texts))
+        visible.append(f"- {s.id}：" + " / ".join(_slide_visible_texts(s)))
     user = (
         "【待核验 claims 与其精确片段】\n" + "\n".join(claims_block) + "\n"
         "【页面可见文字（审查无绑定证据的专业断言）】\n" + "\n".join(visible) + "\n"
         "【输出】SemanticVerdicts JSON：每个上述 claim_id 恰好一条 check；"
         "无 unbound 问题时 unbound_assertions 为空数组。"
+    )
+    return [{"role": "system", "content": system}, {"role": "user", "content": user}]
+
+
+def audit_messages(
+    slides: list[Slide],
+    located: list[Claim],
+    required_ids: list[str],
+    *,
+    system_body: str,
+    system_ver: str,
+) -> list[dict]:
+    """可见文字审计消息（与 claim 语义核验分离的独立通道）：豁免页不进
+    必审清单；已绑定 claim 文本给出，模型只报"未被覆盖"的新专业断言。"""
+    system = f"[prompt_version={system_ver}]\n{system_body}"
+    visible = []
+    for s in slides:
+        if s.id in required_ids:
+            visible.append(f"- {s.id}：" + " / ".join(_slide_visible_texts(s)))
+    bound = "\n".join(f"- {c.id}: {c.text}" for c in located) or "（本批无已绑定claim）"
+    user = (
+        "【需审计页面（每页必须恰好返回一次 audited_slide_ids）】"
+        + "、".join(required_ids) + "\n"
+        "【页面可见文字】\n" + "\n".join(visible) + "\n"
+        "【已绑定claim清单（这些内容已有证据，不算无绑定断言）】\n" + bound + "\n"
+        "【输出】VisibleTextAudit JSON：audited_slide_ids 恰好覆盖需审计页面；"
+        "unbound_assertions 列出未被清单覆盖的新专业断言（slide_id/field_path/text/reason）。"
     )
     return [{"role": "system", "content": system}, {"role": "user", "content": user}]

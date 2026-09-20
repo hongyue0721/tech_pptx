@@ -35,7 +35,11 @@ from courseware_core.errors import (
     VersionConflict,
 )
 from courseware_core.evidence.locator import resolve_evidence
-from courseware_core.jobs.execution_guard import build_job_context, guard_active
+from courseware_core.jobs.execution_guard import (
+    build_job_context,
+    guard_active,
+    guard_writable,
+)
 from courseware_core.llm.prompts import load_system_prompt
 from courseware_core.models import (
     CandidateChange,
@@ -46,6 +50,7 @@ from courseware_core.models import (
     DeckSpec,
     DeckVersion,
     GenerateRequest,
+    IllustrationBlock,
     Job,
     JobAccepted,
     JobResultRef,
@@ -56,7 +61,11 @@ from courseware_core.models import (
 from courseware_core.retrieval.bm25 import search_chunks
 from courseware_core.retrieval.context import select_evidence_within_budget
 from courseware_core.services.coverage_service import TOP_K
-from courseware_core.services.generate_messages import content_messages, verify_messages
+from courseware_core.services.generate_messages import (
+    audit_messages,
+    content_messages,
+    verify_messages,
+)
 from courseware_core.services.idempotency_service import OperationBinder
 from courseware_core.services.plan_service import PlanService
 from courseware_core.storage.change_repository import ChangeRepository
@@ -176,6 +185,7 @@ class GenerateService:
         guard_active(context, "generate")
         content_ver, content_body = load_system_prompt("content", self._prompts_dir)
         verify_ver, verify_body = load_system_prompt("verify", self._prompts_dir)
+        audit_ver, audit_body = load_system_prompt("audit", self._prompts_dir)
         batches = [
             plan.slides[i : i + BATCH_SLIDES_MAX]
             for i in range(0, len(plan.slides), BATCH_SLIDES_MAX)
@@ -186,6 +196,11 @@ class GenerateService:
         unbound: list[UnboundAssertion] = []
         warnings: list[str] = []
         verdict_hashes: list[str] = []
+        # 循环①（Q01/Q06）门：missing_evidence 非空=模型自认缺依据（P0 保守
+        # blocked，放宽须先写 ADR）；可见文字审计覆盖不全=该批未审不得盖绿。
+        missing_valid = True
+        audit_valid = True
+        block_refs_valid = True
 
         for batch in batches:
             hits_by_page = {
@@ -208,10 +223,15 @@ class GenerateService:
             proposal = provider.complete_json(
                 "generate_content", "ContentProposal", messages, context
             ).value
-            located, failures, proposal = self._locate_batch(
+            located, failures, proposal, batch_slides, ref_failures = self._locate_batch(
                 job, batch, selected, proposal, provider, context,
                 content_body, content_ver,
             )
+            # illustration 块引用定位失败（循环②Q04）：失败引用不得入库伪造来源，
+            # 转换后 refs 为空+报告；任一失败即整候选不可提交（引用关系不完整）。
+            if ref_failures:
+                block_refs_valid = False
+                warnings.extend(f"illustration 引用定位失败：{r}" for r in ref_failures)
             # 失败 claim 不进模型队列（locator 合法性由程序决定，verify.md）；
             # invalid 记录本身就是 blocked 的依据。
             for cid, reason in failures.items():
@@ -222,50 +242,92 @@ class GenerateService:
                     )
                 )
             batch_verdicts = self._verify_batch(
-                job, located, proposal.slides, provider, context, verify_body, verify_ver
+                job, located, batch_slides, provider, context, verify_body, verify_ver
             )
             if batch_verdicts is not None:
-                checks_map, dup_ids, batch_unbound, raw_sha = batch_verdicts
+                checks_map, dup_ids, batch_unbound, raw_sha, extra_ids = batch_verdicts
                 verdict_hashes.append(raw_sha)
                 unbound.extend(batch_unbound)
-                for c in located:
-                    if c.id in dup_ids:
+                if extra_ids:
+                    # 严格双射（AGENT_00-Q03）：verdict 造新 claim ID=答复失控，
+                    # 整批核验不可信——全部 not_checked，不采信其余"正常"条目。
+                    for c in located:
                         claim_checks.append(
                             ClaimVerification(
                                 claim_id=c.id, locator_status="located",
                                 semantic_status="not_checked",
-                                reason="semantic model returned duplicate verdicts for this claim",
+                                reason=(
+                                    "semantic verdicts contained unknown claim ids: "
+                                    + ",".join(sorted(extra_ids)[:5])
+                                )[:600],
                             )
                         )
-                        continue
-                    v = checks_map.get(c.id)
-                    if v is None:
-                        # 漏答不得跳过变绿：记 not_checked → 门自然不过。
-                        claim_checks.append(
-                            ClaimVerification(
-                                claim_id=c.id, locator_status="located",
-                                semantic_status="not_checked",
-                                reason="semantic model returned no verdict for this claim",
+                else:
+                    for c in located:
+                        if c.id in dup_ids:
+                            claim_checks.append(
+                                ClaimVerification(
+                                    claim_id=c.id, locator_status="located",
+                                    semantic_status="not_checked",
+                                    reason="semantic model returned duplicate verdicts for this claim",
+                                )
                             )
-                        )
-                    else:
-                        claim_checks.append(
-                            ClaimVerification(
-                                claim_id=c.id, locator_status="located",
-                                semantic_status=v.status, reason=v.reason,
+                            continue
+                        v = checks_map.get(c.id)
+                        if v is None:
+                            # 漏答不得跳过变绿：记 not_checked → 门自然不过。
+                            claim_checks.append(
+                                ClaimVerification(
+                                    claim_id=c.id, locator_status="located",
+                                    semantic_status="not_checked",
+                                    reason="semantic model returned no verdict for this claim",
+                                )
                             )
-                        )
+                        else:
+                            claim_checks.append(
+                                ClaimVerification(
+                                    claim_id=c.id, locator_status="located",
+                                    semantic_status=v.status, reason=v.reason,
+                                )
+                            )
+            # 独立可见文字审计（循环①Q01）：与 claim 语义核验分离，零 claim 批
+            # 也必须过；豁免判据=教师计划 layout=title，模型自报 title 不算豁免。
+            batch_audit = self._audit_batch(
+                job, batch, batch_slides, located, provider, context, audit_body, audit_ver
+            )
+            if batch_audit is not None:
+                audit_ok, batch_audit_unbound = batch_audit
+                if not audit_ok:
+                    audit_valid = False
+                    warnings.append(
+                        "可见文字审计未恰好覆盖本批必审页面（遗漏/重复/未知页均不采信）"
+                    )
+                unbound.extend(batch_audit_unbound)
             claims.extend(located)
-            slides.extend(proposal.slides)
+            slides.extend(batch_slides)
             warnings.extend(proposal.missing_evidence)
+            if proposal.missing_evidence:
+                missing_valid = False
 
         relations_valid = self._relations_valid(slides, claims)
-        # layout 门（T09-Review N2）：页数相等不够——生成页 id 集合必须与
-        # 教师确认计划完全一致，模型偷换/增删页 id 不得过门。
+        # 确定性重排（循环③Q07）：页顺序是教师确认大纲的一部分。模型只是
+        # 批内乱序返回时，服务器按计划顺序规范化落库——顺序差异不是内容差异，
+        # 不得因此浪费一次模型调用，也不得让乱序候选进入教师视野。
+        # id 集合不一致（增删/换页）由 layout 门拦截，保持原样供教师审阅。
+        plan_layouts = {s.id: s.layout for s in plan.slides}
+        if {s.id for s in slides} == set(plan_layouts) and len(slides) == len(plan.slides):
+            # len 相等+集合相等才无重复 id；重复 id 时保留模型原样落库供教师
+            # 审阅（layout/relations 门已拦），重排不去重、不静默丢页。
+            by_id = {s.id: s for s in slides}
+            slides = [by_id[ps.id] for ps in plan.slides]
+        # layout 门（T09-Review N2 + 循环③Q07）：页数相等不够——生成页 id
+        # 集合必须与教师确认计划完全一致（偷换/增删页不得过门），且每页
+        # layout 不得被模型私自改变（布局是教师确认的教学设计的一部分）。
         layout_valid = (
             {s.id for s in slides} == {s.id for s in plan.slides}
             and len(slides) == len(plan.slides)
             and all(len(s.blocks) >= 1 for s in slides)
+            and all(plan_layouts.get(s.id) == s.layout for s in slides)
         )
         # 可执行门（docs/04:41）：全部 claim 恰好覆盖一次、引用可解析、语义全
         # supported、关系/结构通过、unbound 为空——任一不满足即 blocked。
@@ -275,6 +337,9 @@ class GenerateService:
             relations_valid
             and layout_valid
             and full_coverage
+            and missing_valid
+            and audit_valid
+            and block_refs_valid
             and all(x.semantic_status == "supported" for x in claim_checks)
             and not unbound
         )
@@ -304,7 +369,7 @@ class GenerateService:
             warnings=[w[:600] for w in warnings[:40]],
             can_commit=can_commit,
             model_id=self._model_id,
-            prompt_version=f"{content_ver}+{verify_ver}",
+            prompt_version=f"{content_ver}+{verify_ver}+{audit_ver}",
             checked_at=_now_iso(),
             raw_result_sha256=_canonical_sha(verdict_hashes) if verdict_hashes else None,
             unbound_assertions=unbound[:64],
@@ -322,6 +387,9 @@ class GenerateService:
             validation=report,
             created_at=_now_iso(),
         )
+        # 写候选前复查执行有效性（循环④Q08）：取消/deadline/外部状态变化落在
+        # "最后一次核验完成→写库"窗口内时不得留下可被应用的孤儿候选。
+        guard_writable(self._jobs, job.id, context, "generate")
         self._changes.create(change)
         return JobResultRef(type="change", id=change.id)
 
@@ -329,11 +397,15 @@ class GenerateService:
 
     def _locate_batch(self, job, batch, selected, proposal, provider, context,
                       content_body, content_ver):
-        """ContentProposal → 存储 Claim；定位失败整批一次修复机会（docs/06:26）。
+        """ContentProposal → 存储 Claim + 存储 Slide；定位失败整批一次修复机会
+        （docs/06:26）。引用允许集合=本批实际进 prompt 的片段（循环②Q05）——
+        项目语料里存在但模型没见到的 chunk 同样不得引用。
 
-        返回 (located, failures, final_proposal)——核验与落库必须使用与
-        located 同版本的最终 proposal（T09-Review B1：不得"核验A展示B"）。
+        返回 (located, failures, final_proposal, batch_slides, ref_failures)——
+        核验与落库必须使用与 located 同版本的最终 proposal（T09-Review B1：
+        不得"核验A展示B"）；batch_slides 为服务器解析权威字段后的存储 Slide。
         """
+        allowed = {hit.chunk_id for _, hit in selected}
         for attempt in (0, 1):
             located, failures = [], {}
             for cp in proposal.claims:
@@ -344,6 +416,7 @@ class GenerateService:
                             resolve_evidence(
                                 self._conn, project_id=job.project_id,
                                 corpus_revision=job.corpus_revision, proposal=ref,
+                                allowed_chunk_ids=allowed,
                             )
                         )
                     except DomainError as exc:
@@ -359,12 +432,16 @@ class GenerateService:
                     failures[cp.id] = (
                         "; ".join(errs) if errs else "claim has no resolvable evidence refs"
                     )
-            if not failures or attempt == 1:
-                return located, failures, proposal
+            batch_slides, ref_failures = self._convert_slides(job, proposal, allowed)
+            if (not failures and not ref_failures) or attempt == 1:
+                return located, failures, proposal, batch_slides, ref_failures
             note = (
-                "以下 claim 的证据引用定位失败，quote 必须是允许片段的精确唯一原文子串；"
+                "以下引用定位失败，quote 必须是本批允许片段的精确唯一原文子串；"
                 "只修正引用（不改教师计划页与 claim 范围）："
-                + json.dumps(failures, ensure_ascii=False)
+                + json.dumps(
+                    {"claims": failures, "illustration_refs": ref_failures},
+                    ensure_ascii=False,
+                )
             )
             messages = content_messages(
                 self._projects.get(job.project_id).course, batch, selected,
@@ -375,10 +452,46 @@ class GenerateService:
                 "generate_content", "ContentProposal", messages, context
             ).value
 
+    def _convert_slides(self, job, proposal, allowed):
+        """提案 Slide → 存储 Slide（循环②Q04）：illustration 的 chunk_id+quote
+        引用全部经服务器 locator 解析填充权威字段；解析失败的引用不入库
+        （宁可空 refs+报告，绝不存可疑/伪造来源）。返回 (slides, ref_failures)。"""
+        ref_failures: list[str] = []
+        slides: list[Slide] = []
+        for s in proposal.slides:
+            blocks = []
+            for b in s.blocks:
+                if b.type == "illustration":
+                    spans = []
+                    for ref in b.evidence_refs:
+                        try:
+                            spans.append(
+                                resolve_evidence(
+                                    self._conn, project_id=job.project_id,
+                                    corpus_revision=job.corpus_revision, proposal=ref,
+                                    allowed_chunk_ids=allowed,
+                                )
+                            )
+                        except DomainError as exc:
+                            ref_failures.append(f"{ref.chunk_id}: {exc.message}")
+                    blocks.append(
+                        IllustrationBlock(
+                            type="illustration", text=b.text,
+                            assumptions=b.assumptions, evidence_refs=spans,
+                        )
+                    )
+                else:
+                    blocks.append(b)
+            slides.append(
+                Slide(id=s.id, title=s.title, layout=s.layout, blocks=blocks)
+            )
+        return slides, ref_failures
+
     # ---------- 语义核验 ----------
 
     def _verify_batch(self, job, located, batch_slides, provider, context, verify_body, verify_ver):
-        """返回 (checks_map, unbound, raw_sha)；零 fact 批不调模型（docs/18:43）。"""
+        """返回 (checks_map, dup_ids, unbound, raw_sha, extra_ids)；零 fact 批
+        不调语义核验模型（docs/18:43）——但可见文字审计是独立通道，不受此限。"""
         if not located:
             return None
         self._jobs.set_stage(job.id, "validating")
@@ -391,7 +504,12 @@ class GenerateService:
         ).value
         checks_map = {}
         duplicate_ids: set[str] = set()
+        expected = {c.id for c in located}
+        extra_ids: set[str] = set()
         for c in verdicts.checks:
+            if c.claim_id not in expected:
+                extra_ids.add(c.claim_id)
+                continue
             if c.claim_id in checks_map:
                 # "每个 claim_id 恰好一次"（verify.md）：重复答复=该 claim 的
                 # 核验不可信，整条记 not_checked（T09-Review B2：不得保留
@@ -401,7 +519,33 @@ class GenerateService:
                 continue
             checks_map[c.claim_id] = c
         raw_sha = _canonical_sha(verdicts.model_dump(mode="json"))
-        return checks_map, duplicate_ids, list(verdicts.unbound_assertions), raw_sha
+        return checks_map, duplicate_ids, list(verdicts.unbound_assertions), raw_sha, extra_ids
+
+    def _audit_batch(self, job, batch, batch_slides, located, provider, context,
+                     audit_body, audit_ver):
+        """独立可见文字审计（循环①Q01）：与 claim 核验分离的必过通道。
+
+        豁免判据=教师计划页 layout=title（模型自报 layout 不算豁免）；
+        服务端对 audited_slide_ids 与必审页集合做双射核验——遗漏/重复/未知
+        ID 任一命中即整批审计无效（不得因模型少审而盖绿）。
+        返回 None=本批全部为教师确认的封面页，合法豁免；否则 (ok, unbound)。
+        """
+        exempt = {s.id for s in batch if s.layout == "title"}
+        required = [s.id for s in batch_slides if s.id not in exempt]
+        if not required:
+            return None
+        self._jobs.set_stage(job.id, "validating")
+        guard_active(context, "generate")
+        messages = audit_messages(
+            batch_slides, located, required,
+            system_body=audit_body, system_ver=audit_ver,
+        )
+        audit = provider.complete_json(
+            "audit_visible_text", "VisibleTextAudit", messages, context
+        ).value
+        audited = audit.audited_slide_ids
+        ok = sorted(audited) == sorted(required)
+        return ok, list(audit.unbound_assertions)
 
     # ---------- 结构与门 ----------
 

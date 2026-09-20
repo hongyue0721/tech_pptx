@@ -1773,7 +1773,7 @@
         "slides": {
           "type": "array",
           "items": {
-            "$ref": "#/$defs/Slide"
+            "$ref": "#/$defs/ProposalSlide"
           },
           "minItems": 1,
           "maxItems": 16
@@ -1793,6 +1793,154 @@
         "claims",
         "slides",
         "missing_evidence"
+      ],
+      "additionalProperties": false
+    },
+    "ProposalIllustrationBlock": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "const": "illustration"
+        },
+        "text": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 240
+        },
+        "assumptions": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "minItems": 1,
+          "maxItems": 6
+        },
+        "evidence_refs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/EvidenceProposal"
+          },
+          "minItems": 0,
+          "maxItems": 5
+        }
+      },
+      "required": [
+        "type",
+        "text",
+        "assumptions",
+        "evidence_refs"
+      ],
+      "additionalProperties": false
+    },
+    "ProposalSlideBlock": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "fact"
+            },
+            "claim_id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            }
+          },
+          "required": [
+            "type",
+            "claim_id"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "teaching"
+            },
+            "text": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            }
+          },
+          "required": [
+            "type",
+            "text"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "$ref": "#/$defs/ProposalIllustrationBlock"
+        }
+      ]
+    },
+    "ProposalSlide": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 40
+        },
+        "layout": {
+          "type": "string",
+          "enum": [
+            "title",
+            "concept",
+            "two_column",
+            "process_example"
+          ]
+        },
+        "blocks": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ProposalSlideBlock"
+          },
+          "minItems": 1,
+          "maxItems": 6
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "layout",
+        "blocks"
+      ],
+      "additionalProperties": false
+    },
+    "VisibleTextAudit": {
+      "type": "object",
+      "properties": {
+        "audited_slide_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "minItems": 0,
+          "maxItems": 16
+        },
+        "unbound_assertions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/UnboundAssertion"
+          },
+          "minItems": 0,
+          "maxItems": 64
+        }
+      },
+      "required": [
+        "audited_slide_ids",
+        "unbound_assertions"
       ],
       "additionalProperties": false
     },

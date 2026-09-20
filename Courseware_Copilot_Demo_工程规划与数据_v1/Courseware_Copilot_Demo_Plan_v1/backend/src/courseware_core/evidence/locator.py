@@ -3,9 +3,13 @@
 模型只提议 chunk_id + quote；document/page/偏移一律由服务端从存储记录解析填充，
 不接受模型自填页码（docs/04 §19）。quote 必须是归一化 chunk 文本的唯一连续子串：
 零次=不存在，多次=歧义（要求补上下文，不随意取第一次）。
+
+allowed_chunk_ids 是本轮实际提供给模型的片段集合：项目语料里存在但模型没
+见到的 chunk 同样不得引用——否则等于允许模型"偷看"未提供的资料（AGENT_00-Q05）。
 """
 
 import sqlite3
+from typing import Set
 
 from courseware_core.errors import DomainError
 from courseware_core.models import EvidenceProposal, EvidenceSpan
@@ -17,7 +21,15 @@ def resolve_evidence(
     project_id: str,
     corpus_revision: int,
     proposal: EvidenceProposal,
+    allowed_chunk_ids: Set[str],
 ) -> EvidenceSpan:
+    # 先查本轮允许集合（严于累积语料）：模型只能引用真正进过 prompt 的片段。
+    if proposal.chunk_id not in allowed_chunk_ids:
+        raise DomainError(
+            "EVIDENCE_INVALID",
+            "chunk was not provided to the model in this batch",
+            {"chunk_id": proposal.chunk_id},
+        )
     row = conn.execute(
         "SELECT document_id, pdf_page, text FROM chunks"
         " WHERE chunk_id = ? AND project_id = ? AND corpus_revision <= ?",

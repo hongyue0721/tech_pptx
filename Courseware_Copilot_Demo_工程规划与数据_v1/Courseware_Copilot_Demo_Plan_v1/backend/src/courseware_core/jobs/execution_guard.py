@@ -47,3 +47,25 @@ def guard_active(context: JobContext, stage: str) -> None:
         raise JobCancelled({"stage": stage}) from exc
     except DeadlineExceededError as exc:
         raise ModelTimeout("job deadline exceeded", {"stage": stage}) from exc
+
+
+def guard_writable(jobs: JobRepository, job_id: str, context: JobContext,
+                   stage: str) -> None:
+    """昂贵业务结果写库前的执行有效性复查（循环④Q08）。
+
+    worker._publish 的复核发生在 handler 返回之后——取消/deadline/外部状态
+    变化若落在"最后一次模型调用完成 → 候选写库"窗口内，只靠 publish 会留下
+    可被 GET/commit 的 ready 孤儿候选。写库前以 DB 实况复查：行仍 running、
+    未请求取消、deadline 未过（flock 单实例下 status=running 即当前进程
+    持有执行权；被外部标 interrupted 即失效）。
+    """
+    guard_active(context, stage)
+    current = jobs.get_execution_state(job_id)
+    if (
+        current is None
+        or current["status"] != "running"
+        or current["cancel_requested"]
+    ):
+        raise JobCancelled(
+            {"stage": stage, "reason": "execution invalid before result write"}
+        )

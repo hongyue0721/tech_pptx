@@ -48,13 +48,23 @@ def seeded(conn, insert_project):
     return conn
 
 
-def resolve(conn, chunk_id, quote):
+def resolve(conn, chunk_id, quote, allowed=None):
     return resolve_evidence(
         conn,
         project_id="prj_a",
         corpus_revision=3,
         proposal=EvidenceProposal(chunk_id=chunk_id, quote=quote),
+        allowed_chunk_ids=allowed if allowed is not None else {chunk_id},
     )
+
+
+def test_chunk_not_in_allowed_batch_rejected(seeded):
+    # AGENT_00-Q05：项目语料里存在但本批未提供给模型的 chunk 不得被引用——
+    # "存在"不等于"可见"，防模型偷看没进 prompt 的资料。
+    with pytest.raises(DomainError) as exc:
+        resolve(seeded, "chk_1", QUOTE, allowed={"chk_unseen"})
+    assert exc.value.code == "EVIDENCE_INVALID"
+    assert "not provided" in exc.value.message
 
 
 def test_server_fills_offsets_and_page(seeded):
@@ -106,6 +116,7 @@ def test_chunk_from_other_revision_rejected(seeded):
             project_id="prj_a",
             corpus_revision=2,
             proposal=EvidenceProposal(chunk_id="chk_1", quote=QUOTE),
+            allowed_chunk_ids={"chk_1"},
         )
 
 
@@ -147,6 +158,7 @@ def test_cumulative_snapshot_allows_older_chunk(seeded):
         project_id="prj_a",
         corpus_revision=5,
         proposal=EvidenceProposal(chunk_id="chk_1", quote=QUOTE),
+        allowed_chunk_ids={"chk_1"},
     )
     assert span.pdf_page == 7
 
