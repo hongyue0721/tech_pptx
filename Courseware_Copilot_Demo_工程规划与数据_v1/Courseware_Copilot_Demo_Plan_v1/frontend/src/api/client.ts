@@ -21,7 +21,7 @@ function newRequestId(): string {
   return `web_${crypto.randomUUID()}`.slice(0, 128);
 }
 
-async function request<T>(
+export async function request<T>(
   method: string,
   path: string,
   options: { body?: unknown; idempotencyKey?: string; signal?: AbortSignal } = {},

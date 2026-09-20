@@ -1,0 +1,31 @@
+/* 视觉 tokens：来源 FRONTEND_SPEC §2（纸页感、深靛蓝、少量陶色）。
+   禁止项同规格：不堆 Card、不用玻璃效果、不引远程字体/图片。 */
+:root {
+  --cc-bg: #f3f2ee;
+  --cc-panel: #fffefa;
+  --cc-ink: #253144;
+  --cc-ink-weak: #6d756f;
+  --cc-primary: #3f526f;
+  --cc-primary-hover: #35465f;
+  --cc-selected: #eef1f6;
+  --cc-accent: #a76b4a;
+  --cc-success: #4d6e5b;
+  --cc-blocked: #875522;
+  --cc-border: #d9d7d0;
+  --cc-border-strong: #b9b6ac;
+
+  --cc-font-ui: 14px;
+  --cc-font-body: 14px;
+  --cc-font-aux: 12px;
+  --cc-font-title: 24px;
+  --cc-font-section: 16px;
+
+  --cc-radius-control: 8px;
+  --cc-radius-panel: 14px;
+  --cc-gap-panel: 20px;
+  --cc-page-pad: 26px;
+
+  --cc-row-header: 62px;
+  --cc-row-steps: 60px;
+  --cc-row-footer: 66px;
+}
