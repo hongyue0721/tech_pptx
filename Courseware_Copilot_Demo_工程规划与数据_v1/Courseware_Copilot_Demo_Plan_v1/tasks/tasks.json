@@ -323,6 +323,45 @@
     ]
   },
   {
+    "id": "T09B",
+    "stage": "M2",
+    "title": "T09可信边界收口（Q01-Q08）与F00只读接口、开发启动装配",
+    "status": "DONE",
+    "depends_on": [
+      "T09"
+    ],
+    "read_first": [
+      "docs/04-data-model.md",
+      "docs/05-evidence-policy.md",
+      "docs/06-llm-and-workflow.md"
+    ],
+    "allowed_paths": [
+      "backend/",
+      "contracts/",
+      "app-prompts/",
+      "api.md",
+      "process.md",
+      "tasks/tasks.json"
+    ],
+    "acceptance": [
+      "零claim批可见文字审计不可绕过；封面豁免以教师计划layout为判据",
+      "模型不可写服务器权威来源字段；引用限本批提供片段集合",
+      "教师确认顺序与布局受保护（乱序规范化、偷改layout blocked）",
+      "取消/deadline落在写库窗口不产生可应用孤儿候选",
+      "GET deck与GET evidence只读契约化；dev装配唯一worker绑127.0.0.1"
+    ],
+    "constraints": "可信门不得放宽；APP_LIVE=NOT_RUN不以Fake数字补证据；missing_evidence保守策略修改须先写ADR",
+    "owner": "鸿岳（单人主开发）",
+    "evidence": [
+      "基线 commit 6f58642；本轮改动待提交",
+      "pytest 524 passed（478→524，净增46，逐循环先红后绿）",
+      "validate_pack 23/23",
+      "契约同步：models.schema.json+openapi.json+samples（ProposalSlide/ProposalSlideBlock/ProposalIllustrationBlock/VisibleTextAudit）+api.md（EVIDENCE_NOT_FOUND 404、deck version<1→404 语义）",
+      "真实adapter注册表缺陷修复（ContentProposal缺注册，MockTransport路径测试背书）",
+      "独立Review：0阻塞+8非阻塞，N1/N2/N5/N6/N7/N8当场闭环，N3/N4进backlog"
+    ]
+  },
+  {
     "id": "T10",
     "stage": "M2",
     "title": "固定模板渲染和版本导出",

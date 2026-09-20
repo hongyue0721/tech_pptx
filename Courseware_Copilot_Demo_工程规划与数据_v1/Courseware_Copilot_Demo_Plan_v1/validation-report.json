@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-20T04:47:26.269583+00:00",
+  "generated_at": "2026-09-20T11:05:54.882221+00:00",
   "scope": "PACK_STATIC_ONLY",
   "passed": 23,
   "failed": 0,
@@ -8,7 +8,7 @@
       "check": "JSON Schema definitions and references",
       "category": "PACK_STATIC",
       "status": "PASS",
-      "detail": "44 definitions, internal refs resolve"
+      "detail": "48 definitions, internal refs resolve"
     },
     {
       "check": "OpenAPI and api.md route consistency",
@@ -110,7 +110,7 @@
       "check": "Task dependency DAG and initial truth state",
       "category": "PACK_STATIC",
       "status": "PASS",
-      "detail": "17 task cards, acyclic dependencies and read paths"
+      "detail": "18 task cards, acyclic dependencies and read paths"
     },
     {
       "check": "Skill template metadata and scope",

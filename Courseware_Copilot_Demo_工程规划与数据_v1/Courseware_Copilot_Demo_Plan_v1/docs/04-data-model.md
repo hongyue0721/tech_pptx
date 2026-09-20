@@ -16,7 +16,7 @@ Document保存id、项目、原文件名、私有存储路径、sha256、页数�
 
 Chunk永不跨物理页，优先段落/句子边界，目标600—900字符、上限1200字符；重叠不超过100字符。保留页内起止字符偏移。短页不强行拼页。记录chunk_id、document_id、pdf_page、start/end、text、text_sha256、tokenizer_version。
 
-EvidenceSpan引用chunk_id、document_id、pdf_page、chunk内start/end及quote。模型只提议chunk_id+quote；服务端确认quote是归一化chunk的唯一连续子串后填充偏移和页码。重复quote需补上下文，不随意匹配第一次。不接受模型自填的页码/来源作为事实。
+EvidenceSpan引用chunk_id、document_id、pdf_page、chunk内start/end及quote。模型只提议chunk_id+quote（提案类型ProposalSlide/ProposalIllustrationBlock与存储类型隔离，权威字段在Schema层即不可由模型填写）；服务端确认chunk属于本批实际提供给模型的片段集合、quote是归一化chunk的唯一连续子串后填充偏移和页码。重复quote需补上下文，不随意匹配第一次。不接受模型自填的页码/来源作为事实。
 
 ## DeckSpec
 
