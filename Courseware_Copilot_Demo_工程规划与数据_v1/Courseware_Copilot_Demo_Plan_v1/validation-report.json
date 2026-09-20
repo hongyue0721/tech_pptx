@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-19T15:47:58.132753+00:00",
+  "generated_at": "2026-09-20T02:35:39.083203+00:00",
   "scope": "PACK_STATIC_ONLY",
   "passed": 23,
   "failed": 0,
@@ -110,7 +110,7 @@
       "check": "Task dependency DAG and initial truth state",
       "category": "PACK_STATIC",
       "status": "PASS",
-      "detail": "17 planned task cards, acyclic dependencies and read paths"
+      "detail": "17 task cards, acyclic dependencies and read paths"
     },
     {
       "check": "Skill template metadata and scope",

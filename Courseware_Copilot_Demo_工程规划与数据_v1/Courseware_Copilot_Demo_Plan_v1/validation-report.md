@@ -1,6 +1,6 @@
 # 规划包静态校验报告
 
-时间：2026-09-19T15:47:58.132753+00:00
+时间：2026-09-20T02:35:39.083203+00:00
 范围：**PACK_STATIC_ONLY**。通过23项，失败0项。
 
 这只验证文档/契约/生成的测试资产，不表示应用、模型、码道或PPTX链路已通过。
@@ -24,7 +24,7 @@
 |Generated PDF positive and negative properties|PASS|Main PDFs 12 text pages; supplementary 2; variant 4; deliberate encrypted/scan/blank/malformed/mixed properties checked|
 |Demo data manifest, byte lengths and SHA-256|PASS|38 data files checked|
 |Evaluation case references|PASS|39 evaluation definitions; no application execution implied|
-|Task dependency DAG and initial truth state|PASS|17 planned task cards, acyclic dependencies and read paths|
+|Task dependency DAG and initial truth state|PASS|17 task cards, acyclic dependencies and read paths|
 |Skill template metadata and scope|PASS|Valid frontmatter and template disclosure; 3949 source bytes, not a real CodeArts import test|
 |Markdown local links|PASS|Markdown clickable local links resolve|
 |Source marker registration|PASS|21 source records, marker identifiers checked; relevance manually reviewed|

@@ -170,9 +170,11 @@ def task_checks():
   for d in lookup[t]['depends_on']:expect(d in lookup,'Missing dependency');visit(d)
   visiting.remove(t);done.add(t)
  for t in ts:
-  visit(t['id']);expect(t['status']=='PLANNED','Initial task status must be honest')
+  visit(t['id'])
+  expect(t['status'] in ('PLANNED','IN_PROGRESS','PARTIAL','DONE','BLOCKED'),'Task status must be honest')
+  if t['status']=='DONE':expect(t.get('evidence'),'DONE task must carry evidence')
   for p in t['read_first']:expect((ROOT/p).is_file(),'Missing task read path '+p)
- return f'{len(ts)} planned task cards, acyclic dependencies and read paths'
+ return f'{len(ts)} task cards, acyclic dependencies and read paths'
 check('Task dependency DAG and initial truth state',task_checks)
 def skill_checks():
  p=ROOT/'skill-template/teacher-courseware/SKILL.md';raw=p.read_text();front=raw.split('---',2)[1];meta=yaml.safe_load(front)

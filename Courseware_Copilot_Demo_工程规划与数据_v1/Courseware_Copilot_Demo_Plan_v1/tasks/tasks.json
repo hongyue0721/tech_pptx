@@ -3,7 +3,7 @@
     "id": "T00",
     "stage": "M0",
     "title": "资格、账号、授权和预算",
-    "status": "PLANNED",
+    "status": "DONE",
     "depends_on": [],
     "read_first": [
       "docs/17-competition-delivery.md",
@@ -22,13 +22,16 @@
     ],
     "constraints": "负责人主导，AI整理，不代购或代发",
     "owner": "鸿岳（单人主开发）",
-    "evidence": []
+    "evidence": [
+      "负责人确认（本机开发/不外发/不付费/不公网）",
+      "ppt-edit 授权结论见 private-evidence（不入库）"
+    ]
   },
   {
     "id": "T01",
     "stage": "M0",
     "title": "码道开发模型与Skill工具探针",
-    "status": "PLANNED",
+    "status": "DONE",
     "depends_on": [
       "T00"
     ],
@@ -48,13 +51,17 @@
     ],
     "constraints": "不通过不进入业务施工",
     "owner": "鸿岳（单人主开发）",
-    "evidence": []
+    "evidence": [
+      "smoke/t01_codearts_probe/",
+      "smoke/t01_t02_probe_report.md",
+      "codearts models/run 沙箱内实测 PASS（2026-09-18）"
+    ]
   },
   {
     "id": "T02",
     "stage": "M0",
     "title": "AnyUI/PDF/导出器最小链",
-    "status": "PLANNED",
+    "status": "DONE",
     "depends_on": [
       "T00"
     ],
@@ -78,13 +85,16 @@
     ],
     "constraints": "锁定一个Exporter与依赖版本",
     "owner": "鸿岳（单人主开发）",
-    "evidence": []
+    "evidence": [
+      "负责人 WPS 实测：v2 打开/改文本框/保存重开修改仍在（L1-L3 PASS）",
+      "smoke/t02_anyui_probe/（AnyUI 四组件运行时 PASS）"
+    ]
   },
   {
     "id": "T03",
     "stage": "M1",
     "title": "Schema/API与工程骨架",
-    "status": "PLANNED",
+    "status": "DONE",
     "depends_on": [
       "T01",
       "T02"
@@ -110,13 +120,17 @@
     ],
     "constraints": "不实现未冻结功能",
     "owner": "鸿岳（单人主开发）",
-    "evidence": []
+    "evidence": [
+      "commit 18f4f6c",
+      "docs/reviews/t03-review.md",
+      "pytest 140 passed"
+    ]
   },
   {
     "id": "T04",
     "stage": "M1",
     "title": "SQLite任务、幂等与版本仓库",
-    "status": "PLANNED",
+    "status": "DONE",
     "depends_on": [
       "T03"
     ],
@@ -137,13 +151,17 @@
     ],
     "constraints": "先可靠状态再接LLM",
     "owner": "鸿岳（单人主开发）",
-    "evidence": []
+    "evidence": [
+      "commit b5cf4da",
+      "docs/reviews/t04-review.md",
+      "pytest 206 passed"
+    ]
   },
   {
     "id": "T05",
     "stage": "M1",
     "title": "PDF导入、规范化与切块",
-    "status": "PLANNED",
+    "status": "DONE",
     "depends_on": [
       "T04"
     ],
@@ -165,13 +183,17 @@
     ],
     "constraints": "仅文本PDF，不OCR",
     "owner": "鸿岳（单人主开发）",
-    "evidence": []
+    "evidence": [
+      "commit 2a05115",
+      "docs/reviews/t05-review.md",
+      "pytest 276 passed"
+    ]
   },
   {
     "id": "T06",
     "stage": "M1",
     "title": "检索、覆盖与证据定位",
-    "status": "PLANNED",
+    "status": "DONE",
     "depends_on": [
       "T05"
     ],
@@ -192,13 +214,18 @@
     ],
     "constraints": "评估答案不得被运行读取",
     "owner": "鸿岳（单人主开发）",
-    "evidence": []
+    "evidence": [
+      "commit d0a0e5e",
+      "docs/reviews/t06-review.md",
+      "pytest 315 passed",
+      "evaluation 检索命中率实测 10/10"
+    ]
   },
   {
     "id": "T07",
     "stage": "M2",
     "title": "APP模型Adapter与预算",
-    "status": "PLANNED",
+    "status": "DONE",
     "depends_on": [
       "T03"
     ],
@@ -221,13 +248,18 @@
     ],
     "constraints": "独立于DEV模型",
     "owner": "鸿岳（单人主开发）",
-    "evidence": []
+    "evidence": [
+      "commit f54a928 + 209214c",
+      "docs/reviews/t07-review.md",
+      "docs/t07-protocol-smoke.md（deepseek-flash 六探针 PASS）",
+      "pytest 353 passed"
+    ]
   },
   {
     "id": "T08",
     "stage": "M2",
     "title": "大纲生成和教师确认",
-    "status": "PLANNED",
+    "status": "DONE",
     "depends_on": [
       "T06",
       "T07"
@@ -250,7 +282,11 @@
     ],
     "constraints": "不给不存在资料补常识",
     "owner": "鸿岳（单人主开发）",
-    "evidence": []
+    "evidence": [
+      "commit 444209e + f6f860a + c126edd + 3efdc84",
+      "docs/reviews/t08-review.md",
+      "pytest 389 passed"
+    ]
   },
   {
     "id": "T09",
