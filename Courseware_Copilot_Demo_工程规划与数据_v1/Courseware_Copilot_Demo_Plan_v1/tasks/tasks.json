@@ -419,7 +419,7 @@
     "owner": "鸿岳（单人主开发）",
     "evidence": [
       "F1 完成（2026-09-20）：AnyUI@0.5.2 锁版本正式接入+三页路由+外壳+tokens+真实读取骨架；typecheck/build 退出码0；截图 docs/screenshots/f1/（1366×768 三页、941/1180/1440）；ADR-10 已登记",
-      "F2 完成（2026-09-20）：真实资料→解析→大纲链浏览器验收（无模拟上传/解析）+useJobPolling/errorMessages/idempotency 基础设施+attempt 幂等修复；截图 docs/screenshots/f2/；confirm/generate 成功链 NOT_RUN（待模型授权）",
+      "F2 完成（2026-09-20）：真实资料→解析→大纲→候选全链浏览器验收 PASS（deepseek-flash 当轮授权：plan 1 调用+generate 10 调用，42 claims 40 supported/2 partial→候选诚实 blocked 不盖绿）；截图 docs/screenshots/f2/（4 张）；真实调用暴露并修复 prompt 三处契约字面错位（content-v3/verify-v2/audit-v2，防退化测试锁死），527 全绿",
       "F3/F4 未做：候选审阅/commit/证据抽屉/deck 读取/可靠性矩阵"
     ]
   },

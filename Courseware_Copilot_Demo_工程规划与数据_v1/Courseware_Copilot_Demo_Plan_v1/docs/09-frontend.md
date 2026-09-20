@@ -89,6 +89,6 @@ PDF_TEXT_UNAVAILABLE→换文本型 PDF；PDF_ENCRYPTED→暂不支持加密 PDF
 
 F1（已完成）：AnyUI 正式接入、三页路由、外壳、视觉 tokens、真实 GET project/materials/plan/change/deck 读取骨架；未接写入操作一律诚实 disabled+原因，生产代码路径无 mock 数据（演示数据只允许出现在测试 fixture）。截图见 docs/screenshots/f1/（1366×768 三页、941×768 review、1440×900 materials、1180×740 review）。
 
-F2（已完成，2026-09-20）：真实资料→真实大纲链。上传逐份+parse 轮询释放写锁、duplicate 不占位、job 精确写入 URL 并刷新恢复（URL job 优先→服务器 active_job_id 兜底）、幂等键=操作意图+业务锚点+attempt（attempt 由 URL query `pa` 承载：job 终态=意图已消费 attempt 前进、刷新不丢；受理结果未知同键恢复）、confirm 成功才 generations 严格串行、缺口目标禁勾+取消引用预检与后端同口径、"已逐页审阅"勾选门防一次点击绕过确认、stale 只读、错误码→教师文案映射（api.md 表为真源）。真实浏览器链验收（无模拟上传/解析）截图 docs/screenshots/f2/；独立 Review 3 阻塞+7 非阻塞全部当场闭环（docs/reviews/t11-f2-review.md）。诚实边界：confirm/generate 成功链 NOT_RUN（无真实模型预算授权）；导出/应用仍 disabled（T10/T12/F3 未接）。
+F2（已完成，2026-09-20）：真实资料→真实大纲链。上传逐份+parse 轮询释放写锁、duplicate 不占位、job 精确写入 URL 并刷新恢复（URL job 优先→服务器 active_job_id 兜底）、幂等键=操作意图+业务锚点+attempt（attempt 由 URL query `pa` 承载：job 终态=意图已消费 attempt 前进、刷新不丢；受理结果未知同键恢复）、confirm 成功才 generations 严格串行、缺口目标禁勾+取消引用预检与后端同口径、"已逐页审阅"勾选门防一次点击绕过确认、stale 只读、错误码→教师文案映射（api.md 表为真源）。真实浏览器链验收（无模拟上传/解析）截图 docs/screenshots/f2/；独立 Review 3 阻塞+7 非阻塞全部当场闭环（docs/reviews/t11-f2-review.md）。成功链真实模型实测 PASS（2026-09-20 负责人授权 deepseek-flash：大纲 succeeded→confirm→generate succeeded 10 调用→自动跳审阅；42 claims 40 supported+2 partial→候选诚实显示"未通过核验"、应用禁用；prompt_version/model_id 留痕于 ValidationReport）。
 
 F3：候选核验渲染、commit、deck、Evidence Drawer。F4：可靠性矩阵（UI_TEST_MATRIX）。每轮同步 api.md/OpenAPI/Schema/前端类型/契约测试（仅契约真实变化时）与 process.md/tasks.json。
