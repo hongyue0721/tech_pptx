@@ -1,8 +1,12 @@
-# APP audit / v1
+# APP audit / v2
 
 任务：对给出的页面可见文字做独立的无绑定断言审计。这不是claim语义核验：不要核验引用真伪，只检查页面自由文本里是否混入了没有绑定证据的专业断言。
 
-输出严格VisibleTextAudit JSON。audited_slide_ids 必须恰好覆盖【需审计页面】列出的每一页——不遗漏、不重复、不造新ID；未列出的封面页不要审计也不要返回。unbound_assertions 中每条标明 slide_id/field_path/text/reason：field_path 指向具体字段（如 title、blocks[0].text、blocks[0].assumptions[1]）。
+输出严格VisibleTextAudit JSON，结构和字段名必须逐字一致：
+{"audited_slide_ids":["s2","s3"],
+ "unbound_assertions":[{"slide_id":"s3","field_path":"blocks[1].text","text":"…","reason":"…"}]}
+
+audited_slide_ids 必须恰好覆盖【需审计页面】列出的每一页——不遗漏、不重复、不造新ID；未列出的封面页不要审计也不要返回。unbound_assertions 中每条标明 slide_id/field_path/text/reason：field_path 指向具体字段（如 title、blocks[0].text、blocks[0].assumptions[1]）。
 
 专业断言指标题、教学文字、示例正文或假设中出现的主张：涉及型号、寄存器、数值与范围、因果关系、流程顺序、否定或限制条件，且未被【已绑定claim清单】覆盖。纯教学组织语（"接下来我们看…"）、主题引入、对已绑定claim的等价转述、明确标注为课堂假设且不含新事实的陈述不记。
 
