@@ -12,6 +12,7 @@ from courseware_core.errors import (
     JobCancelled,
     WorkerAlreadyRunning,
 )
+from courseware_core.materials.gc import cleanup_orphan_material_files
 from courseware_core.models import ErrorDetail, ErrorResponse, Job, JobResultRef
 from courseware_core.storage.database import connect
 from courseware_core.storage.job_repository import JobRepository
@@ -37,6 +38,7 @@ class JobWorker:
 
     - 单实例：flock 独占锁文件，第二个 worker 直接 WorkerAlreadyRunning；
     - 启动恢复：上一进程遗留的 running job 标 interrupted，绝不自动重放（可能已产生费用）；
+    - 材料 GC：仅在取得独占锁后执行一次（R00-B 锁序，见 materials/gc 时序契约）；
     - 领取：SQLite 单语句 CAS，claimed 后在 worker 线程执行注册的 handler；
     - 线程内使用独立 SQLite 连接（连接不跨线程）。
     """
@@ -49,12 +51,14 @@ class JobWorker:
         poll_interval: float = 0.2,
         worker_id: Optional[str] = None,
         lock_path: Optional[Path] = None,
+        materials_root: Optional[Path] = None,
     ):
         self._db_path = Path(db_path)
         self._handlers = dict(handlers)
         self._poll_interval = poll_interval
         self._worker_id = worker_id or f"worker_{secrets.token_hex(6)}"
         self._lock_path = lock_path or Path(str(self._db_path) + ".worker.lock")
+        self._materials_root = Path(materials_root) if materials_root else None
         self._stop_event = threading.Event()
         self._thread: Optional[threading.Thread] = None
         self._lock_fd: Optional[int] = None
@@ -69,6 +73,10 @@ class JobWorker:
         self._acquire_singleton_lock()
         try:
             self._recover_on_startup()
+            # GC 必须在锁后（第二实例锁前不得触碰共享数据目录）、线程启动前
+            # （请求服务前清完，运行期不再执行）。
+            if self._materials_root is not None:
+                cleanup_orphan_material_files(self._materials_root, self._db_path)
             self._stop_event.clear()
             self._thread = threading.Thread(
                 target=self._run, name=f"job-worker-{self._worker_id}", daemon=True
@@ -80,9 +88,20 @@ class JobWorker:
             raise
 
     def stop(self, timeout: float = 5.0) -> None:
+        """优雅停止：等执行线程退出后才释放独占锁。
+
+        R00-B：join 超时且线程仍存活=handler 卡住（如模型调用挂起）。此时
+        不能释放锁——第二实例会并发进入而卡住线程仍在写库；也不能谎报已停止。
+        抛 RuntimeError 如实暴露，调用方决定升级处理（进程退出时锁随 fd 释放）。
+        """
         self._stop_event.set()
         if self._thread is not None:
             self._thread.join(timeout=timeout)
+            if self._thread.is_alive():
+                raise RuntimeError(
+                    f"worker {self._worker_id} did not stop within {timeout}s; "
+                    "exclusive lock retained"
+                )
             self._thread = None
         self._release_singleton_lock()
 
@@ -143,7 +162,24 @@ class JobWorker:
                 error=_error_response("INTERNAL_ERROR", "job execution failed"),
             )
         else:
-            repo.finalize(job.id, "succeeded", result_ref=result_ref)
+            self._publish(repo, job, result_ref)
+
+    def _publish(self, repo: JobRepository, job: Job, result_ref) -> None:
+        """发布业务结果前复核任务状态、取消与所有权（R00-B）。
+
+        handler 执行期间用户可能已请求取消：协作式取消的语义是"本次执行作废"，
+        结果已产出也不得伪记 succeeded；状态/所有权被外部改变（如另一进程启动
+        恢复已标 interrupted）时不覆盖既有终态，以当前行为准。
+        """
+        current = repo.get_execution_state(job.id)
+        if current is None or current["status"] != "running":
+            return
+        if current["worker_id"] != self._worker_id:
+            return
+        if current["cancel_requested"]:
+            repo.finalize(job.id, "cancelled")
+            return
+        repo.finalize(job.id, "succeeded", result_ref=result_ref)
 
     def _acquire_singleton_lock(self) -> None:
         self._lock_path.parent.mkdir(parents=True, exist_ok=True)

@@ -271,3 +271,39 @@ def test_extractor_version_recorded(svc, conn):
         (accepted.material_id,),
     ).fetchone()
     assert row["extractor_version"] == EXTRACTOR_VERSION
+
+
+class TestParseExecutionStateR00:
+    """R00-D：parse 真实 stage 上报与保存前取消检查。"""
+
+    def test_cancel_requested_fails_fast_before_store(self, svc, conn):
+        # 取消位已置：不得再执行昂贵的切块入库（corpus 不推进）。
+        from courseware_core.errors import JobCancelled
+
+        upload(svc, NOTES_PDF.read_bytes())
+        jobs = JobRepository(conn)
+        job = jobs.claim_next("w1")
+        jobs.request_cancel(job.id)
+        with pytest.raises(JobCancelled):
+            svc.handle_parse(job)
+        assert conn.execute("SELECT corpus_revision FROM projects").fetchone()[0] == 0
+        assert conn.execute("SELECT COUNT(*) c FROM chunks").fetchone()["c"] == 0
+
+    def test_parse_reports_parsing_stage(self, svc, conn, monkeypatch):
+        import courseware_core.services.material_service as ms
+
+        upload(svc, NOTES_PDF.read_bytes())
+        jobs = JobRepository(conn)
+        job = jobs.claim_next("w1")
+        seen = {}
+        real = ms.parse_pdf
+
+        def spy(*args, **kwargs):
+            seen["stage"] = conn.execute(
+                "SELECT stage FROM jobs WHERE id = ?", (job.id,)
+            ).fetchone()["stage"]
+            return real(*args, **kwargs)
+
+        monkeypatch.setattr(ms, "parse_pdf", spy)
+        svc.handle_parse(job)
+        assert seen["stage"] == "parsing"  # 领取后 stage 不得停在 queued（真实进度）

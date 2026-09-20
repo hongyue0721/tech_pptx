@@ -51,7 +51,7 @@ def upload_material(
         f"POST /projects/{project_id}/materials", filename, data
     )
 
-    def produce() -> tuple[int, dict]:
+    def produce(binder) -> tuple[int, dict]:
         accepted = service.upload(project_id=project_id, original_name=filename, data=data)
         return 202, accepted.model_dump(mode="json")
 

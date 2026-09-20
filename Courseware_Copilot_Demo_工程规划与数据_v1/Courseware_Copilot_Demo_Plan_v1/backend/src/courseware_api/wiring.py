@@ -57,32 +57,9 @@ def build_worker_handlers(
 
 
 def resolve_materials_root(db_path: Path, override: Path | None) -> Path:
+    # 注意：启动孤儿 GC 不在本层——已移至 courseware_core.materials.gc，
+    # 由 JobWorker 在取得数据目录独占锁后执行（R00-B 锁序收口）。
     root = override if override is not None else db_path.parent / "materials"
     if ".." in str(root):
         raise ValidationFailed("materials root must not contain '..'")
     return Path(root)
-
-
-def cleanup_orphan_material_files(materials_root: Path, db_path: Path) -> int:
-    """启动 GC（docs/04 §47、review N4）：删除无 DB 指针的原件与残留 tmp 文件。
-
-    只清"无指针"文件——有指针文件被删会导致 ARTIFACT/parse 读取显式失败，
-    不属于启动期能自行决定的清理范围。
-    """
-    if not materials_root.exists():
-        return 0
-    conn = connect(db_path)
-    try:
-        referenced = {
-            row["id"] for row in conn.execute("SELECT id FROM materials").fetchall()
-        }
-    finally:
-        conn.close()
-    removed = 0
-    for path in materials_root.rglob("*"):
-        if not path.is_file():
-            continue
-        if ".tmp-" in path.name or path.stem not in referenced:
-            path.unlink(missing_ok=True)
-            removed += 1
-    return removed

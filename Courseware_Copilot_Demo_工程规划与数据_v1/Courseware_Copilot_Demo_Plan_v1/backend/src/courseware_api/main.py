@@ -15,7 +15,7 @@ from courseware_api.api.routes_materials import router as materials_router
 from courseware_api.api.routes_plans import router as plans_router
 from courseware_api.api.routes_projects import router as projects_router
 from courseware_api.error_mapping import _error_payload, register_error_handlers
-from courseware_api.wiring import cleanup_orphan_material_files, resolve_materials_root
+from courseware_api.wiring import resolve_materials_root
 from courseware_core.jobs.worker import JobHandler, JobWorker
 from courseware_core.services.material_service import ProjectLimits
 from courseware_core.storage.database import connect, init_db
@@ -68,10 +68,12 @@ def create_app(
     conn.close()
 
     materials_dir = resolve_materials_root(db_path, materials_root)
-    cleanup_orphan_material_files(materials_dir, db_path)
-
+    # R00-B：GC 不在 create_app 执行——第二实例在取得数据目录独占锁之前
+    # 不得触碰共享目录（活动上传窗口文件会被误删）。GC 归 worker 锁后路径。
     worker = (
-        JobWorker(db_path, worker_handlers) if worker_handlers is not None else None
+        JobWorker(db_path, worker_handlers, materials_root=materials_dir)
+        if worker_handlers is not None
+        else None
     )
 
     @asynccontextmanager

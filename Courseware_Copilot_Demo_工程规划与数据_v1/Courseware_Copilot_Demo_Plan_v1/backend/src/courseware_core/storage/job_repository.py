@@ -1,5 +1,5 @@
 import sqlite3
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from courseware_core.errors import JobNotFound
@@ -19,16 +19,23 @@ def _now_iso() -> str:
 class JobRepository:
     """jobs 表持久化。领取用单语句 CAS（RETURNING），终态与项目锁释放在同一事务。"""
 
-    def __init__(self, conn: sqlite3.Connection):
+    # docs/06：项目任务总预算 600 秒（受理即落 deadline，执行侧据此收口）。
+    DEFAULT_DEADLINE_SECONDS = 600
+
+    def __init__(
+        self, conn: sqlite3.Connection, job_deadline_seconds: int = DEFAULT_DEADLINE_SECONDS
+    ):
         self._conn = conn
+        self._job_deadline_seconds = job_deadline_seconds
 
     def create(self, job: Job, request_id: Optional[str] = None) -> None:
+        deadline_at = (job.created_at + timedelta(seconds=self._job_deadline_seconds)).isoformat()
         with self._conn:
             self._conn.execute(
                 "INSERT INTO jobs (id, project_id, kind, status, stage, cancel_requested,"
                 " base_version, corpus_revision, result_ref, error, llm_calls, request_id,"
-                " created_at, updated_at)"
-                " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                " deadline_at, created_at, updated_at)"
+                " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (
                     job.id,
                     job.project_id,
@@ -42,6 +49,7 @@ class JobRepository:
                     job.error.model_dump_json() if job.error else None,
                     job.llm_calls,
                     request_id,
+                    deadline_at,
                     job.created_at.isoformat(),
                     job.updated_at.isoformat(),
                 ),
@@ -169,15 +177,45 @@ class JobRepository:
             raise JobNotFound({"job_id": job_id})
         return result
 
+    def get_execution_state(self, job_id: str) -> Optional[dict]:
+        """发布结果前的轻量复核通道：内部执行列（worker_id）不在 Job 契约模型里。"""
+        row = self._conn.execute(
+            "SELECT status, cancel_requested, worker_id FROM jobs WHERE id = ?", (job_id,)
+        ).fetchone()
+        return dict(row) if row is not None else None
+
+    def get_deadline_remaining(self, job_id: str) -> Optional[float]:
+        """任务剩余时间预算（秒）。
+
+        None=无 deadline（v1 遗留行）；负值=总预算已耗尽，执行侧必须在任何
+        昂贵动作（模型调用/切块入库）之前收口。
+        """
+        row = self._conn.execute(
+            "SELECT deadline_at FROM jobs WHERE id = ?", (job_id,)
+        ).fetchone()
+        if row is None or row["deadline_at"] is None:
+            return None
+        deadline = datetime.fromisoformat(row["deadline_at"])
+        if deadline.tzinfo is None:
+            deadline = deadline.replace(tzinfo=timezone.utc)
+        return (deadline - datetime.now(timezone.utc)).total_seconds()
+
     def set_stage(self, job_id: str, stage: str, now: Optional[str] = None) -> Job:
+        """进行中任务的 stage 上报。
+
+        R00-Review N2：带 running 守卫——stale worker（任务已被外部收口为
+        终态/interrupted）的迟到上报不得把终态行写回进行中；静默 no-op。
+        """
         now = now or _now_iso()
         with self._conn:
             cur = self._conn.execute(
-                "UPDATE jobs SET stage = ?, updated_at = ? WHERE id = ?",
+                "UPDATE jobs SET stage = ?, updated_at = ?"
+                " WHERE id = ? AND status = 'running'",
                 (stage, now, job_id),
             )
             if cur.rowcount == 0:
-                raise JobNotFound({"job_id": job_id})
+                if self.get(job_id) is None:
+                    raise JobNotFound({"job_id": job_id})
         result = self.get(job_id)
         assert result is not None
         return result

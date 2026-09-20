@@ -174,6 +174,35 @@ class TestPlansRoutes:
         ).fetchone()["n"]
         assert n == 1
 
+    def test_plan_acceptance_crash_before_response_cache_recovers_same_job(self, client_db):
+        # R00-D 故障注入：受理请求的业务事务已提交（job 行+锚点在），
+        # 响应缓存写入前进程崩溃（占位行残留）——同键重试必须找回原 job，
+        # 不得 409 in-flight 死等，更不得二次落 job。
+        client, conn = client_db
+        project_id = seed_ready_project(client, conn)
+        body = {"corpus_revision": 1}
+        headers = {"Idempotency-Key": "k-plan-crash"}
+        r1 = client.post(
+            f"/api/v1/projects/{project_id}/plans", json=body, headers=headers
+        )
+        assert r1.status_code == 202
+        job_id = r1.json()["job_id"]
+        # 模拟崩溃现场：成品响应退回到占位行（锚点 operation_ref 保留）。
+        with conn:
+            conn.execute(
+                "UPDATE idempotency_keys SET response_status = -1, response_body = 'null'"
+                " WHERE idem_key = 'k-plan-crash'"
+            )
+        r2 = client.post(
+            f"/api/v1/projects/{project_id}/plans", json=body, headers=headers
+        )
+        assert r2.status_code == 202
+        assert r2.json()["job_id"] == job_id
+        n = conn.execute(
+            "SELECT COUNT(*) AS n FROM jobs WHERE kind='plan'"
+        ).fetchone()["n"]
+        assert n == 1
+
     def test_post_plans_busy_409(self, client_db):
         client, conn = client_db
         project_id = seed_ready_project(client, conn)
@@ -431,3 +460,45 @@ class TestPlanEndToEnd:
             )
             assert r.status_code in (202, 422)  # 422=结构校验拒绝，但不得是409 PROJECT_BUSY
             assert r.status_code != 409
+
+
+class TestConsentGateContract:
+    """R00-A：consent=false → POST /plans 同步拒绝且不留 job；
+    本地 PDF 上传解析不需要外发，不受门禁影响（api.md §创建与资料）。"""
+
+    def test_post_plans_rejected_without_consent(self, client_db):
+        client, conn = client_db
+        project_id = seed_ready_project(client, conn)
+        with conn:
+            conn.execute(
+                "UPDATE projects SET consent_to_cloud_processing=0 WHERE id=?",
+                (project_id,),
+            )
+        r = client.post(
+            f"/api/v1/projects/{project_id}/plans",
+            json={"corpus_revision": 1},
+            headers={"Idempotency-Key": "k-consent-1"},
+        )
+        assert r.status_code == 409
+        assert r.json()["error"]["code"] == "CONSENT_REQUIRED"
+        # 拒绝必须发生在建 job 之前：不得留下排队中的 plan job。
+        n = conn.execute(
+            "SELECT COUNT(*) AS n FROM jobs WHERE kind='plan'"
+        ).fetchone()["n"]
+        assert n == 0
+
+    def test_material_upload_allowed_without_consent(self, client_db):
+        client, conn = client_db
+        body = json.loads(json.dumps(PROJECT_BODY))
+        body["consent_to_cloud_processing"] = False
+        r = client.post(
+            "/api/v1/projects", json=body, headers={"Idempotency-Key": "k-consent-2"}
+        )
+        assert r.status_code == 201
+        project_id = r.json()["id"]
+        r = client.post(
+            f"/api/v1/projects/{project_id}/materials",
+            headers={"Idempotency-Key": "k-consent-3"},
+            files={"file": ("x.pdf", b"%PDF-1.4 local-only", "application/pdf")},
+        )
+        assert r.status_code == 202

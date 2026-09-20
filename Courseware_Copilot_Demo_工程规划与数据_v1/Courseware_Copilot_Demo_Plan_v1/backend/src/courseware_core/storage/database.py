@@ -1,7 +1,7 @@
 import sqlite3
 from pathlib import Path
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 
 _PROJECTS_DDL = """
 CREATE TABLE IF NOT EXISTS projects (
@@ -22,7 +22,8 @@ CREATE TABLE IF NOT EXISTS schema_meta (
 );
 """
 
-# jobs：契约 Job 类型 1:1 + 内部追踪列（request_id/worker_id/claimed_at，不出现在对外形状）。
+# jobs：契约 Job 类型 1:1 + 内部追踪列（request_id/worker_id/claimed_at/deadline_at，
+# 不出现在对外形状）。deadline_at=受理时计算的任务总预算时刻（docs/06，R00-D）。
 # 状态/stage 的 CHECK 与 contracts/models.schema.json enum 对齐，防脏状态入库。
 _JOBS_DDL = """
 CREATE TABLE IF NOT EXISTS jobs (
@@ -43,6 +44,7 @@ CREATE TABLE IF NOT EXISTS jobs (
     request_id TEXT,
     worker_id TEXT,
     claimed_at TEXT,
+    deadline_at TEXT,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
 );
@@ -51,6 +53,8 @@ CREATE INDEX IF NOT EXISTS idx_jobs_project ON jobs(project_id);
 """
 
 # 幂等：scope=会话|项目|路由（docs/07 §2），保留24h（过期懒清理）。
+# operation_ref（R00-D）：占位行锚定的业务资源 id（如 job_id）。锚点与业务写入
+# 同事务提交——"响应缓存未写就崩溃"后同键重试可凭锚点找回原业务结果。
 _IDEMPOTENCY_DDL = """
 CREATE TABLE IF NOT EXISTS idempotency_keys (
     scope TEXT NOT NULL,
@@ -58,6 +62,7 @@ CREATE TABLE IF NOT EXISTS idempotency_keys (
     request_hash TEXT NOT NULL,
     response_status INTEGER NOT NULL,
     response_body TEXT NOT NULL,
+    operation_ref TEXT,
     created_at TEXT NOT NULL,
     PRIMARY KEY (scope, idem_key)
 );
@@ -178,6 +183,20 @@ def connect(db_path: Path) -> sqlite3.Connection:
     return conn
 
 
+def _migrate_v1_to_v2(conn: sqlite3.Connection) -> None:
+    """v1→v2（R00-D）：补 jobs.deadline_at 与 idempotency_keys.operation_ref。
+
+    新库 DDL 已含列；仅老库 PRAGMA 检查后 ALTER。SQLite ADD COLUMN 可空列
+    为元数据操作，不重写数据。
+    """
+    job_cols = {r[1] for r in conn.execute("PRAGMA table_info(jobs)")}
+    if "deadline_at" not in job_cols:
+        conn.execute("ALTER TABLE jobs ADD COLUMN deadline_at TEXT")
+    idem_cols = {r[1] for r in conn.execute("PRAGMA table_info(idempotency_keys)")}
+    if "operation_ref" not in idem_cols:
+        conn.execute("ALTER TABLE idempotency_keys ADD COLUMN operation_ref TEXT")
+
+
 def init_db(conn: sqlite3.Connection) -> None:
     with conn:
         conn.executescript(
@@ -195,3 +214,6 @@ def init_db(conn: sqlite3.Connection) -> None:
         row = conn.execute("SELECT version FROM schema_meta").fetchone()
         if row is None:
             conn.execute("INSERT INTO schema_meta(version) VALUES (?)", (SCHEMA_VERSION,))
+        elif row[0] < 2:
+            _migrate_v1_to_v2(conn)
+            conn.execute("UPDATE schema_meta SET version = 2")

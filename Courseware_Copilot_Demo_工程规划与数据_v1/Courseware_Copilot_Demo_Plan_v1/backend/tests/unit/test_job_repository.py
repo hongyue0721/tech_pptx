@@ -305,3 +305,47 @@ def test_concurrent_claim_next_single_winner(tmp_path):
     t1.join()
     t2.join()
     assert sorted(results, key=lambda x: (x is None, x or "")) == ["job_race", None]
+
+
+class TestDeadlineR00:
+    """R00-D：受理即落任务总 deadline（docs/06 项目任务总预算 600 秒）。"""
+
+    def test_create_writes_total_deadline(self, conn, insert_project):
+        insert_project("prj_a")
+        JobRepository(conn).create(make_job("job_dl", created_at=T0))
+        row = conn.execute(
+            "SELECT deadline_at FROM jobs WHERE id = 'job_dl'"
+        ).fetchone()
+        assert row["deadline_at"] == "2026-09-19T00:10:00+00:00"
+
+    def test_deadline_seconds_configurable(self, conn, insert_project):
+        insert_project("prj_a")
+        JobRepository(conn, job_deadline_seconds=120).create(make_job("job_dl2"))
+        row = conn.execute(
+            "SELECT deadline_at FROM jobs WHERE id = 'job_dl2'"
+        ).fetchone()
+        assert row["deadline_at"] == "2026-09-19T00:02:00+00:00"
+
+    def test_get_deadline_remaining(self, conn, insert_project):
+        insert_project("prj_a")
+        JobRepository(conn).create(
+            make_job("job_rem", created_at="2026-09-19T00:00:00+00:00")
+        )
+        # deadline=00:10 早已过去 → 负值（执行侧据此拒绝开工）
+        assert JobRepository(conn).get_deadline_remaining("job_rem") < 0
+        assert JobRepository(conn).get_deadline_remaining("job_missing") is None
+
+    def test_set_stage_does_not_dirty_write_terminal_row(self, conn, insert_project):
+        # R00-Review N2：stale worker 的 stage 上报不得把已终态行写回进行中。
+        insert_project("prj_a")
+        repo = JobRepository(conn)
+        repo.create(make_job("job_fin"))
+        with conn:
+            conn.execute(
+                "UPDATE projects SET active_job_id = 'job_fin' WHERE id = 'prj_a'"
+            )
+        job = repo.claim_next("w1")
+        repo.finalize(job.id, "succeeded")
+        repo.set_stage("job_fin", "planning")
+        row = conn.execute("SELECT stage FROM jobs WHERE id = 'job_fin'").fetchone()
+        assert row["stage"] == "finished"

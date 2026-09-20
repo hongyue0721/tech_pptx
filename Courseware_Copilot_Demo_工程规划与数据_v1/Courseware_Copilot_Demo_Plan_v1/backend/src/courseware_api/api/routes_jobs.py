@@ -24,7 +24,7 @@ def cancel_job(
     service: JobService = Depends(get_job_service),
     idem: IdempotencyService = Depends(get_idempotency_service),
 ) -> Response:
-    def produce() -> tuple[int, dict]:
+    def produce(binder) -> tuple[int, dict]:
         return 200, service.cancel_job(job_id).model_dump(mode="json")
 
     # 幂等 scope 的"项目"分量以 job_id 代理（review N11）：

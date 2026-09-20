@@ -142,3 +142,26 @@ class InsufficientEvidence(DomainError):
 
     def __init__(self, message: str = "insufficient evidence in materials", details: Optional[dict] = None):
         super().__init__("INSUFFICIENT_EVIDENCE", message, details)
+
+
+class ConsentRequired(DomainError):
+    """云处理告知未确认（consent=false）：拒绝进入任何云推理（api.md §创建与资料）。
+
+    本地解析不受影响；教师须在创建项目时确认告知，P0 无项目更新路径。
+    """
+
+    def __init__(self, details: Optional[dict] = None):
+        super().__init__(
+            "CONSENT_REQUIRED",
+            "cloud processing consent not granted for this project",
+            details,
+        )
+
+
+class PlanNotConfirmed(DomainError):
+    """生成门禁：未确认（或已 stale）的大纲计划不得进入候选生成（api.md:78）。"""
+
+    def __init__(self, details: Optional[dict] = None):
+        super().__init__(
+            "PLAN_NOT_CONFIRMED", "lesson plan is not confirmed for this corpus", details
+        )

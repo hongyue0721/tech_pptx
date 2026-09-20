@@ -13,6 +13,7 @@ class IdempotencyRecord:
     response_status: int
     response_body: str
     created_at: str
+    operation_ref: Optional[str] = None
 
 
 class IdempotencyRepository:
@@ -33,6 +34,7 @@ class IdempotencyRepository:
             response_status=row["response_status"],
             response_body=row["response_body"],
             created_at=row["created_at"],
+            operation_ref=row["operation_ref"],
         )
 
     def try_reserve(self, scope: str, key: str, request_hash: str, created_at: str) -> bool:
@@ -55,6 +57,19 @@ class IdempotencyRepository:
                 " created_at = ? WHERE scope = ? AND idem_key = ?",
                 (response_status, response_body_json, stored_at, scope, key),
             )
+
+    def bind_operation(self, scope: str, key: str, ref: str) -> None:
+        """把业务资源 id 锚定到占位行（R00-D）。
+
+        刻意不开启自身事务：必须在业务写入的同一事务内被调用（见
+        IdempotencyService.execute 的 binder 契约），保证"业务已提交 ⇔
+        锚点存在"原子成立；业务回滚时锚点一并回滚。
+        """
+        self._conn.execute(
+            "UPDATE idempotency_keys SET operation_ref = ?"
+            " WHERE scope = ? AND idem_key = ?",
+            (ref, scope, key),
+        )
 
     def delete(self, scope: str, key: str) -> None:
         with self._conn:

@@ -1,10 +1,11 @@
 import json
 import sqlite3
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from courseware_core.errors import ProjectBusy, ProjectNotFound
 from courseware_core.models import DocumentChunk, Material, PageWarning
+from courseware_core.storage.job_repository import JobRepository
 
 _WRITE_KINDS_REQUIRING_LOCK = ("parse", "plan", "generate", "edit")
 
@@ -71,14 +72,18 @@ class MaterialRepository:
             self._conn.execute(
                 "INSERT INTO jobs (id, project_id, kind, status, stage, cancel_requested,"
                 " base_version, corpus_revision, result_ref, error, llm_calls, request_id,"
-                " created_at, updated_at)"
-                " VALUES (?, ?, 'parse', 'queued', 'queued', 0, ?, ?, NULL, NULL, 0, ?, ?, ?)",
+                " deadline_at, created_at, updated_at)"
+                " VALUES (?, ?, 'parse', 'queued', 'queued', 0, ?, ?, NULL, NULL, 0, ?, ?, ?, ?)",
                 (
                     job_id,
                     material.project_id,
                     proj["current_version"],
                     proj["corpus_revision"],
                     request_id,
+                    (
+                        datetime.now(timezone.utc)
+                        + timedelta(seconds=JobRepository.DEFAULT_DEADLINE_SECONDS)
+                    ).isoformat(timespec="seconds"),
                     now,
                     now,
                 ),

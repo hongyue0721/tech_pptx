@@ -31,6 +31,8 @@ DOMAIN_ERROR_STATUS = {
     "CORPUS_CHANGED": 409,
     "PROJECT_BUSY": 409,
     "PLAN_NOT_CONFIRMED": 409,
+    # 云推理入口的告知门禁：确认后须重新创建项目（P0 无项目更新路由）。
+    "CONSENT_REQUIRED": 409,
     # JobCancelled 只在 worker 内的 LLM 调用路径抛出并由 worker 收口为 job 终态
     # （api.md 定性"job终态"）；此映射是同步路径缺省兜底，当前无同步抛出点。
     "CANCELLED": 409,

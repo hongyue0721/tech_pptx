@@ -138,7 +138,9 @@ def test_end_to_end_worker_parses_material(tmp_path: Path):
     with TestClient(app) as client:
         pid = seed_project(client)
         accepted = upload(client, pid, DEMO_PDF.read_bytes(), "k1").json()
-        deadline = time.time() + 5
+        # 等待窗 10s：冷启动首跑（.pyc 编译+jieba 词典首载）在满负载下可超 5s，
+        # 这是异步收敛窗口不是行为断言；断言本身（ready/succeeded）不放宽。
+        deadline = time.time() + 10
         status = None
         while time.time() < deadline:
             listing = client.get(f"/api/v1/projects/{pid}/materials").json()
@@ -171,8 +173,8 @@ def test_content_length_preflight_rejects_oversize(tmp_path: Path):
         assert r.json()["error"]["code"] == "PAYLOAD_TOO_LARGE"
 
 
-def test_startup_gc_removes_orphan_files(tmp_path: Path):
-    """N4 回归：无指针孤儿与残留 tmp 在启动期清理，有指针文件保留。"""
+def test_worker_startup_gc_removes_orphan_files(tmp_path: Path):
+    """R00-B（N4 收口）：GC 随 worker 取得独占锁后执行；孤儿与残留 tmp 清理，有指针文件保留。"""
     db = tmp_path / "gc" / "app.db"
     root = tmp_path / "gc" / "materials"
     app = create_app(db, materials_root=root)
@@ -180,14 +182,39 @@ def test_startup_gc_removes_orphan_files(tmp_path: Path):
         pid = seed_project(client)
         accepted = upload(client, pid, DEMO_PDF.read_bytes(), "k1").json()
         stored = root / f"{accepted['material_id']}.pdf"
-    # 手工制造孤儿与残留 tmp
+    # 手工制造孤儿与残留 tmp；只有带 worker（锁后）的启动才触发 GC。
     (root / "mat_ghost.pdf").write_bytes(b"%PDF-orphan")
     (root / "mat_tmp.pdf.tmp-999").write_bytes(b"partial")
-    app2 = create_app(db, materials_root=root)
+    app2 = create_app(
+        db, worker_handlers=build_worker_handlers(db, root), materials_root=root
+    )
     with TestClient(app2):
         assert not (root / "mat_ghost.pdf").exists()
         assert not (root / "mat_tmp.pdf.tmp-999").exists()
         assert stored is not None and stored.exists()
+
+
+def test_app_without_worker_does_not_gc_active_files(tmp_path: Path):
+    """R00-B：未取得独占权的第二实例不得触碰数据目录——
+
+    活动上传窗口（文件已落盘、DB 指针未提交）绝不能被误当孤儿删除。
+    """
+    db = tmp_path / "gc2" / "app.db"
+    root = tmp_path / "gc2" / "materials"
+    root.mkdir(parents=True)
+    app1 = create_app(
+        db, worker_handlers=build_worker_handlers(db, root), materials_root=root
+    )
+    with TestClient(app1):
+        # 第一实例 worker 持锁、启动 GC 已跑完；此刻模拟在途上传的文件。
+        (root / "mat_live.pdf").write_bytes(b"%PDF-live")
+        (root / "mat_live.pdf.tmp-123").write_bytes(b"partial")
+        # 第二实例 create_app（无 worker）：锁前路径不得执行任何 GC。
+        app2 = create_app(db, materials_root=root)
+        with TestClient(app2):
+            pass
+        assert (root / "mat_live.pdf").exists()
+        assert (root / "mat_live.pdf.tmp-123").exists()
 
 
 def test_worker_failure_releases_lock_for_next_upload(tmp_path: Path):

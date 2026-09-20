@@ -7,7 +7,11 @@ from fastapi.responses import JSONResponse
 
 from courseware_core.errors import ValidationFailed
 from courseware_core.models import ContractModel
-from courseware_core.services.idempotency_service import CachedResponse, IdempotencyService
+from courseware_core.services.idempotency_service import (
+    CachedResponse,
+    IdempotencyService,
+    OperationBinder,
+)
 from courseware_core.storage.idempotency_repository import IdempotencyRepository
 
 IDEMPOTENCY_KEY_HEADER = "Idempotency-Key"
@@ -54,7 +58,7 @@ def execute_idempotent(
     route: str,
     project_ref: str,
     body: Optional[ContractModel],
-    produce: Callable[[], tuple[int, Optional[dict]]],
+    produce: Callable[[OperationBinder], tuple[int, Optional[dict]]],
     request_hash_override: Optional[str] = None,
 ) -> Response:
     key = require_idempotency_key(request)

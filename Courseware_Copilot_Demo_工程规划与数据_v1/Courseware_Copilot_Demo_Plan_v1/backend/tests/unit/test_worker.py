@@ -177,3 +177,69 @@ def test_app_lifespan_runs_single_worker(tmp_path):
         assert c.get("/api/v1/health").status_code == 200
         assert wait_until(lambda: job_status(db, "job_life") == "succeeded")
     assert job_status(db, "job_life") == "succeeded"
+
+
+class TestStopSemanticsR00:
+    """R00-B：stop 超时但线程仍存活时，不得释放独占锁、不得谎报已停止。"""
+
+    def test_stop_timeout_keeps_exclusive_lock_and_raises(self, db_path):
+        entered = threading.Event()
+        release = threading.Event()
+
+        def blocking_handler(job: Job):
+            entered.set()
+            release.wait(timeout=10)
+            return None
+
+        seed_job(db_path, "job_block", status="queued")
+        w1 = JobWorker(db_path, handlers={"parse": blocking_handler}, poll_interval=0.02)
+        w1.start()
+        try:
+            assert entered.wait(timeout=3), "handler 未进入执行"
+            with pytest.raises(RuntimeError):
+                w1.stop(timeout=0.2)
+            # 卡住的线程还在改 DB，锁必须保留：第二实例不得取得独占权。
+            w2 = JobWorker(db_path, handlers={}, poll_interval=0.02)
+            with pytest.raises(WorkerAlreadyRunning):
+                w2.start()
+            # 不谎报已停止：job 仍为 running，未被伪造成终态。
+            assert job_status(db_path, "job_block") == "running"
+        finally:
+            release.set()
+            assert wait_until(lambda: not w1.is_alive(), timeout=5)
+            w1.stop(timeout=1)
+
+    def test_cancel_during_handler_run_does_not_publish_result(self, db_path):
+        """发布业务结果前复核取消位：执行中请求取消不得把结果伪记 succeeded。"""
+        entered = threading.Event()
+        release = threading.Event()
+        ref = JobResultRef(type="material", id="mat_c")
+
+        def slow_handler(job: Job):
+            entered.set()
+            release.wait(timeout=10)
+            return ref
+
+        seed_job(db_path, "job_c", status="queued")
+        worker = JobWorker(db_path, handlers={"parse": slow_handler}, poll_interval=0.02)
+        worker.start()
+        try:
+            assert entered.wait(timeout=3)
+            conn = connect(db_path)
+            JobRepository(conn).request_cancel("job_c")
+            conn.close()
+            release.set()
+            assert wait_until(
+                lambda: job_status(db_path, "job_c") in {"cancelled", "succeeded"},
+                timeout=5,
+            )
+            conn = connect(db_path)
+            row = conn.execute(
+                "SELECT status, result_ref FROM jobs WHERE id='job_c'"
+            ).fetchone()
+            conn.close()
+            assert row["status"] == "cancelled"
+            assert row["result_ref"] is None
+        finally:
+            release.set()
+            worker.stop()

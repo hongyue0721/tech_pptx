@@ -24,9 +24,10 @@ def create_plan(
     service: PlanService = Depends(get_plan_service),
     idem: IdempotencyService = Depends(get_idempotency_service),
 ) -> Response:
-    def produce() -> tuple[int, dict]:
+    def produce(binder) -> tuple[int, dict]:
         accepted = service.create_plan_job(
-            project_id, body, request_id=getattr(request.state, "request_id", None)
+            project_id, body, request_id=getattr(request.state, "request_id", None),
+            binder=binder,
         )
         return 202, accepted.model_dump(mode="json")
 
@@ -60,7 +61,7 @@ def confirm_plan(
     service: PlanService = Depends(get_plan_service),
     idem: IdempotencyService = Depends(get_idempotency_service),
 ) -> Response:
-    def produce() -> tuple[int, dict]:
+    def produce(binder) -> tuple[int, dict]:
         plan = service.confirm_plan(project_id, plan_id, body)
         return 200, plan.model_dump(mode="json")
 

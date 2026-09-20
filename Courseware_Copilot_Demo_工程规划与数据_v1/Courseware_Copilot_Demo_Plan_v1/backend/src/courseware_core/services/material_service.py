@@ -13,6 +13,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from courseware_core.errors import DomainError, ProjectNotFound, ValidationFailed
+from courseware_core.jobs.execution_guard import build_job_context, guard_active
+from courseware_core.llm.budget import JobContext
 from courseware_core.materials.chunker import split_page
 from courseware_core.materials.parser import (
     EXTRACTOR_VERSION,
@@ -30,6 +32,7 @@ from courseware_core.models import (
     MaterialUploadAccepted,
     PageWarning,
 )
+from courseware_core.storage.job_repository import JobRepository
 from courseware_core.storage.material_repository import MaterialRepository
 from courseware_core.storage.project_repository import ProjectRepository
 
@@ -70,6 +73,7 @@ class MaterialService:
         self._conn = conn
         self._materials = MaterialRepository(conn)
         self._projects = ProjectRepository(conn)
+        self._jobs = JobRepository(conn)
         self.materials_root = Path(materials_root)
         self._limits = limits
 
@@ -157,15 +161,20 @@ class MaterialService:
 
         失败路径把 material 收口为 failed 再抛错（worker 收口 job failed 并释锁），
         任何异常类型都不留 parsing 僵尸行（review N3）；未成功入库不推进 corpus（docs/04 §7）。
+        R00-D：取消/deadline 在 material 标 parsing 与昂贵入库之前收口——
+        取消的请求不产生任何语料副作用。
         """
         material = self._materials.get_by_job(job.id)
         if material is None:
             raise ValidationFailed(
                 "parse job without material row", {"job_id": job.id}
             )
+        context = build_job_context(self._jobs, job.id, max_calls=1)
+        guard_active(context, "parse")
+        self._jobs.set_stage(job.id, "parsing")
         self._materials.set_parsing(material.id)
         try:
-            return self._parse_and_store(job, material)
+            return self._parse_and_store(job, material, context)
         except DomainError as exc:
             self._materials.set_failed(material.id, exc.code)
             raise
@@ -173,7 +182,9 @@ class MaterialService:
             self._materials.set_failed(material.id, "INTERNAL_ERROR")
             raise
 
-    def _parse_and_store(self, job: Job, material: Material) -> JobResultRef:
+    def _parse_and_store(
+        self, job: Job, material: Material, context: JobContext
+    ) -> JobResultRef:
         used_pages, used_chars = self._materials.ready_page_budget(material.project_id)
         limits = ParseLimits(
             max_pages=max(self._limits.max_project_pages - used_pages, 1),
@@ -208,6 +219,9 @@ class MaterialService:
             )
             document_warnings.extend(page.warnings)
 
+        # 入库前复核（R00-D）：解析大文件期间可能已取消/超总预算，
+        # 收口于昂贵事务之前，语料不推进。
+        guard_active(context, "parse")
         self._materials.save_parsed(
             material,
             pdf_pages=parsed.pdf_pages,

@@ -23,7 +23,7 @@ def create_project(
     service: ProjectService = Depends(get_project_service),
     idem: IdempotencyService = Depends(get_idempotency_service),
 ) -> Response:
-    def produce() -> tuple[int, dict]:
+    def produce(binder) -> tuple[int, dict]:
         return 201, service.create_project(body).model_dump(mode="json")
 
     return execute_idempotent(request, idem, "POST /projects", "-", body, produce)
@@ -45,7 +45,7 @@ def delete_project(
     service: ProjectService = Depends(get_project_service),
     idem: IdempotencyService = Depends(get_idempotency_service),
 ) -> Response:
-    def produce() -> tuple[int, None]:
+    def produce(binder) -> tuple[int, None]:
         service.delete_project(project_id, body)
         return 204, None
 

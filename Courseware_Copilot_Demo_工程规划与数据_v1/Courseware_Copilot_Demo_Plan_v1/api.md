@@ -6,7 +6,7 @@
 
 前缀 `/api/v1`；JSON UTF-8。时间为带时区的ISO8601 UTC。ID为不透明字符串，由服务端产生。成功响应直接返回类型化对象，不套模糊success/data多层。
 
-受保护演示采用同源HTTPS与网关Basic Auth；本地模式只绑定127.0.0.1。公网无鉴权禁止启动。请求含 `X-Request-ID` 可回传，但服务器必须验证长度/字符；没有则生成。变更操作必须带 `Idempotency-Key`（1—128字符），作用域与行为见任务文档。
+受保护演示采用同源HTTPS与网关Basic Auth；本地模式只绑定127.0.0.1。公网无鉴权禁止启动。请求含 `X-Request-ID` 可回传，但服务器必须验证长度/字符；没有则生成。变更操作必须带 `Idempotency-Key`（1—128字符），作用域与行为见任务文档。受理型操作（202 JobAccepted）的幂等占位与业务资源同事务锚定：若"业务已提交、响应未缓存"时进程中断，同键同载荷重试返回 202 与原 `job_id`（找回，不重执行、不二次落 job）；占位无锚点且在飞窗口内返回 409 IDEMPOTENCY_CONFLICT（in flight）。
 
 错误统一为 `{ "error": { "code": "...", "message": "...", "request_id": "...", "details": {} } }`。details不含Key、任意绝对路径或原始供应商敏感响应。422本地化字段错误；503仅服务不可用，不滥用500掩盖缺资料。
 
@@ -75,7 +75,7 @@ PreviewManifest标 `source_type=pptd_render|pptx_render|outline`。outline只是
 | PAYLOAD_TOO_LARGE / PAGE_LIMIT_EXCEEDED | 413 | 缩减资料 |
 | UNSUPPORTED_FILE / PDF_ENCRYPTED / PDF_TEXT_UNAVAILABLE | 422 | 换可解析资料 |
 | VALIDATION_ERROR / EDIT_UNSUPPORTED | 422 | 修改请求 |
-| IDEMPOTENCY_CONFLICT / VERSION_CONFLICT / CORPUS_CHANGED / PROJECT_BUSY / PLAN_NOT_CONFIRMED | 409 | 刷新/确认后重做 |
+| IDEMPOTENCY_CONFLICT / VERSION_CONFLICT / CORPUS_CHANGED / PROJECT_BUSY / PLAN_NOT_CONFIRMED / CONSENT_REQUIRED | 409 | 刷新/确认后重做；CONSENT_REQUIRED须确认告知后重新建项目 |
 | INSUFFICIENT_EVIDENCE / EVIDENCE_CONFLICT / EVIDENCE_INVALID | 422或job.blocked | 保持旧版本、补材料/收窄目标 |
 | MODEL_AUTH_ERROR / MODEL_PROTOCOL_ERROR | 502或job.failed | 修配置，不无限重试 |
 | MODEL_RATE_LIMIT / MODEL_TIMEOUT | 503或job.failed | 受预算限制重试 |
