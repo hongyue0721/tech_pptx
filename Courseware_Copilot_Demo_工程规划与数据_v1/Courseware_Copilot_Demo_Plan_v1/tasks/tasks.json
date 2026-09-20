@@ -292,7 +292,7 @@
     "id": "T09",
     "stage": "M2",
     "title": "候选课件、语义核验和提交",
-    "status": "PLANNED",
+    "status": "DONE",
     "depends_on": [
       "T08",
       "T04"
@@ -315,7 +315,12 @@
     ],
     "constraints": "核心可信逻辑不可降级跳过",
     "owner": "鸿岳（单人主开发）",
-    "evidence": []
+    "evidence": [
+      "commit 42a0d96 + d8ef826",
+      "docs/reviews/t09-review.md",
+      "pytest 478 passed",
+      "evaluation/cases.json semantic 类 case 归 T14 实测"
+    ]
   },
   {
     "id": "T10",
