@@ -1,7 +1,7 @@
 import sqlite3
 from pathlib import Path
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 4
 
 _PROJECTS_DDL = """
 CREATE TABLE IF NOT EXISTS projects (
@@ -22,8 +22,9 @@ CREATE TABLE IF NOT EXISTS schema_meta (
 );
 """
 
-# jobs：契约 Job 类型 1:1 + 内部追踪列（request_id/worker_id/claimed_at/deadline_at，
-# 不出现在对外形状）。deadline_at=受理时计算的任务总预算时刻（docs/06，R00-D）。
+# jobs：契约 Job 类型 1:1 + 内部追踪列（request_id/worker_id/claimed_at/deadline_at/
+# params_json，不出现在对外形状）。deadline_at=受理时计算的任务总预算时刻（docs/06，R00-D）；
+# params_json=T09 受理参数（plan_id/base_version），执行侧按 job 精确取参、不猜。
 # 状态/stage 的 CHECK 与 contracts/models.schema.json enum 对齐，防脏状态入库。
 _JOBS_DDL = """
 CREATE TABLE IF NOT EXISTS jobs (
@@ -45,6 +46,7 @@ CREATE TABLE IF NOT EXISTS jobs (
     worker_id TEXT,
     claimed_at TEXT,
     deadline_at TEXT,
+    params_json TEXT,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
 );
@@ -174,6 +176,26 @@ CREATE INDEX IF NOT EXISTS idx_plans_project_rev ON plans(project_id, corpus_rev
 """
 
 
+# T09：候选变更（CandidateChange）。整对象随 change_json 持久化（对齐 plans 存法），
+# status/kind 冗余成列供查询与 CAS；status 五态、kind 两态与 models.schema.json enum 对齐。
+# 生成与应用分离：committed 仅由 commit 的 CAS 路径写入。
+_CHANGES_DDL = """
+CREATE TABLE IF NOT EXISTS changes (
+    id TEXT PRIMARY KEY,
+    project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+    base_version INTEGER NOT NULL CHECK (base_version >= 0),
+    corpus_revision INTEGER NOT NULL CHECK (corpus_revision >= 1),
+    status TEXT NOT NULL CHECK (status IN
+        ('ready','blocked','committed','discarded','stale')),
+    kind TEXT NOT NULL CHECK (kind IN ('generation','edit')),
+    change_json TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_changes_project ON changes(project_id, created_at);
+"""
+
+
 def connect(db_path: Path) -> sqlite3.Connection:
     conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row
@@ -197,6 +219,14 @@ def _migrate_v1_to_v2(conn: sqlite3.Connection) -> None:
         conn.execute("ALTER TABLE idempotency_keys ADD COLUMN operation_ref TEXT")
 
 
+def _migrate_columns(conn: sqlite3.Connection) -> None:
+    """列级迁移统一入口：v1→v2 两列 + v4 jobs.params_json（幂等 PRAGMA 检查）。"""
+    _migrate_v1_to_v2(conn)
+    job_cols = {r[1] for r in conn.execute("PRAGMA table_info(jobs)")}
+    if "params_json" not in job_cols:
+        conn.execute("ALTER TABLE jobs ADD COLUMN params_json TEXT")
+
+
 def init_db(conn: sqlite3.Connection) -> None:
     with conn:
         conn.executescript(
@@ -210,10 +240,13 @@ def init_db(conn: sqlite3.Connection) -> None:
             + _PAGES_DDL
             + _CHUNKS_DDL
             + _PLANS_DDL
+            + _CHANGES_DDL
         )
         row = conn.execute("SELECT version FROM schema_meta").fetchone()
         if row is None:
             conn.execute("INSERT INTO schema_meta(version) VALUES (?)", (SCHEMA_VERSION,))
-        elif row[0] < 2:
-            _migrate_v1_to_v2(conn)
-            conn.execute("UPDATE schema_meta SET version = 2")
+        else:
+            # 列级迁移幂等（PRAGMA 检查后 ALTER）；新表由上方 CREATE IF NOT EXISTS 补齐。
+            if row[0] < SCHEMA_VERSION:
+                _migrate_columns(conn)
+                conn.execute("UPDATE schema_meta SET version = ?", (SCHEMA_VERSION,))

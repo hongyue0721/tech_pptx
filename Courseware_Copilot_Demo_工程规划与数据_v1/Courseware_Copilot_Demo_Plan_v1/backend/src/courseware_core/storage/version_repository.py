@@ -2,7 +2,7 @@ import hashlib
 import json
 import sqlite3
 from datetime import datetime, timezone
-from typing import Optional
+from typing import Callable, Optional
 
 from courseware_core.errors import (
     CorpusChanged,
@@ -37,9 +37,15 @@ class VersionRepository:
         expected_base_version: int,
         expected_corpus_revision: int,
         restored_from: Optional[int] = None,
+        on_committed: Optional[Callable[[sqlite3.Connection], None]] = None,
     ) -> DeckVersion:
         """显式 CAS 提交（review N2）：先条件 UPDATE 移动指针，rowcount 判定冲突，
-        并发同 base 时失败方得到 VersionConflict 而非原始 IntegrityError。"""
+        并发同 base 时失败方得到 VersionConflict 而非原始 IntegrityError。
+
+        on_committed（T09）：在同一事务内、提交前回调（候选状态迁移 CAS），
+        保证"版本已前进 ⇔ 候选已标记 committed"原子成立——不存在提交了版本
+        而候选仍 ready 可被二次提交的中间态；回调抛异常则整体回滚。
+        """
         created_at = datetime.now(timezone.utc).isoformat()
         new_version = expected_base_version + 1
         with self._conn:
@@ -78,6 +84,8 @@ class VersionRepository:
                     stored.model_dump_json(),
                 ),
             )
+            if on_committed is not None:
+                on_committed(self._conn)
         return DeckVersion(
             project_id=project_id,
             version=new_version,

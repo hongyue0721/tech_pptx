@@ -39,6 +39,7 @@ from courseware_core.models import (
     PlanRequest,
 )
 from courseware_core.retrieval.bm25 import search_chunks
+from courseware_core.retrieval.context import select_evidence_within_budget
 from courseware_core.services.coverage_service import (
     TOP_K,
     evaluate_goal_coverage,
@@ -217,12 +218,7 @@ class PlanService:
         return JobResultRef(type="plan", id=plan.id)
 
     def _accumulate_llm_calls(self, job_id: str, attempts: int) -> None:
-        # jobs.llm_calls 列 CHECK 0-24（docs/06 预算）；封顶不报错，如实累计。
-        with self._conn:
-            self._conn.execute(
-                "UPDATE jobs SET llm_calls = MIN(24, llm_calls + ?) WHERE id = ?",
-                (attempts, job_id),
-            )
+        self._jobs.accumulate_llm_calls(job_id, attempts)
 
     def _build_messages(self, project, coverage, selected, system_prompt: str) -> list:
         """组装 teacher_request + allowed_materials 两分区 user 消息（docs/05、app-prompts README）。
@@ -258,27 +254,14 @@ class PlanService:
             {"role": "user", "content": "\n".join(lines)},
         ]
 
-    @staticmethod
-    def _assemble_context(hits_by_goal: dict):
-        """按目标轮转取片段：每目标≤8、全局≤8000字符（docs/05），先到先得会饿死
-        后面的目标，所以轮转（round-robin）保证多目标公平。"""
-        selected = []
-        used_ids: set[str] = set()
-        budget = CONTEXT_CHAR_BUDGET
-        for rank in range(CONTEXT_PER_GOAL_MAX):
-            for goal_index in sorted(hits_by_goal):
-                hits = hits_by_goal[goal_index]
-                if rank >= len(hits):
-                    continue
-                hit = hits[rank]
-                if hit.chunk_id in used_ids:
-                    continue
-                if budget - len(hit.text) < 0:
-                    return selected
-                used_ids.add(hit.chunk_id)
-                budget -= len(hit.text)
-                selected.append((goal_index, hit))
-        return selected
+    def _assemble_context(self, hits_by_goal: dict):
+        """按目标轮转取片段：每目标≤8、全局≤8000字符（docs/05 §9）。
+        公平算法唯一实现在 retrieval/context（plan/generate 共用，不平行复制）。"""
+        return select_evidence_within_budget(
+            hits_by_goal,
+            per_key_max=CONTEXT_PER_GOAL_MAX,
+            char_budget=CONTEXT_CHAR_BUDGET,
+        )
 
     # ---------- 读取（stale 在读取路径计算，不写库） ----------
 

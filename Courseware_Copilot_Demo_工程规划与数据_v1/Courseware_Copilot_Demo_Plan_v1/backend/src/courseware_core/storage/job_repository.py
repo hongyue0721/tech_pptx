@@ -1,3 +1,4 @@
+import json
 import sqlite3
 from datetime import datetime, timedelta, timezone
 from typing import Optional
@@ -199,6 +200,23 @@ class JobRepository:
         if deadline.tzinfo is None:
             deadline = deadline.replace(tzinfo=timezone.utc)
         return (deadline - datetime.now(timezone.utc)).total_seconds()
+
+    def get_params(self, job_id: str) -> dict:
+        """受理参数内部列（T09：generate 的 plan_id/base_version），无则空 dict。"""
+        row = self._conn.execute(
+            "SELECT params_json FROM jobs WHERE id = ?", (job_id,)
+        ).fetchone()
+        if row is None or not row["params_json"]:
+            return {}
+        return json.loads(row["params_json"])
+
+    def accumulate_llm_calls(self, job_id: str, attempts: int) -> None:
+        # jobs.llm_calls 列 CHECK 0-24（docs/06 预算）；封顶不报错，如实累计。
+        with self._conn:
+            self._conn.execute(
+                "UPDATE jobs SET llm_calls = MIN(24, llm_calls + ?) WHERE id = ?",
+                (attempts, job_id),
+            )
 
     def set_stage(self, job_id: str, stage: str, now: Optional[str] = None) -> Job:
         """进行中任务的 stage 上报。
