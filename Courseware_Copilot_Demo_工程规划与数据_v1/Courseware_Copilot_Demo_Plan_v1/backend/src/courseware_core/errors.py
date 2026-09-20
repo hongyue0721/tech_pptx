@@ -165,3 +165,19 @@ class PlanNotConfirmed(DomainError):
         super().__init__(
             "PLAN_NOT_CONFIRMED", "lesson plan is not confirmed for this corpus", details
         )
+
+
+class ChangeNotFound(DomainError):
+    """候选变更不存在或不属于该项目（不泄露跨项目存在性，api.md 404 组）。"""
+
+    def __init__(self, details: Optional[dict] = None):
+        super().__init__("CHANGE_NOT_FOUND", "candidate change not found", details)
+
+
+class ChangeNotCommittable(DomainError):
+    """候选不可应用：blocked/已提交/核验未全过（docs/04:41 可执行门）。"""
+
+    def __init__(self, details: Optional[dict] = None):
+        super().__init__(
+            "CHANGE_NOT_COMMITTABLE", "candidate change is not committable", details
+        )

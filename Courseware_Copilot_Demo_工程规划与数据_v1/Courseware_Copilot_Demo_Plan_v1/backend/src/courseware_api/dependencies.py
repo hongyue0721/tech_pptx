@@ -3,6 +3,7 @@ from typing import Iterator
 
 from fastapi import Depends, Request
 
+from courseware_core.services.generate_service import GenerateService
 from courseware_core.services.idempotency_service import IdempotencyService
 from courseware_core.services.job_service import JobService
 from courseware_core.services.material_service import MaterialService
@@ -50,3 +51,9 @@ def get_material_service(
 def get_plan_service(conn: sqlite3.Connection = Depends(get_conn)) -> PlanService:
     # 路由层只做受理/读取/确认，不调模型——provider 在 worker handler 注入。
     return PlanService(conn)
+
+
+def get_generate_service(
+    conn: sqlite3.Connection = Depends(get_conn),
+) -> "GenerateService":
+    return GenerateService(conn)

@@ -15,6 +15,7 @@ DOMAIN_ERROR_STATUS = {
     "JOB_NOT_FOUND": 404,
     "ARTIFACT_NOT_FOUND": 404,
     "PLAN_NOT_FOUND": 404,
+    "CHANGE_NOT_FOUND": 404,
     "PAYLOAD_TOO_LARGE": 413,
     "PAGE_LIMIT_EXCEEDED": 413,
     "EXTRACTION_LIMIT_EXCEEDED": 413,
@@ -31,6 +32,7 @@ DOMAIN_ERROR_STATUS = {
     "CORPUS_CHANGED": 409,
     "PROJECT_BUSY": 409,
     "PLAN_NOT_CONFIRMED": 409,
+    "CHANGE_NOT_COMMITTABLE": 409,
     # 云推理入口的告知门禁：确认后须重新创建项目（P0 无项目更新路由）。
     "CONSENT_REQUIRED": 409,
     # JobCancelled 只在 worker 内的 LLM 调用路径抛出并由 worker 收口为 job 终态

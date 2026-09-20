@@ -5,6 +5,15 @@ from courseware_core.storage.database import connect, init_db
 T0 = "2026-09-19T00:00:00+00:00"
 
 
+@pytest.fixture(scope="session", autouse=True)
+def _warm_tokenizer():
+    """jieba 词典首载约数秒，会吃掉冷启动跑批里 e2e 的异步等待窗口（flake
+    根因）。会话级预热一次，业务等待窗口保持原值不动。"""
+    from courseware_core.retrieval.tokenizer import tokenize
+
+    tokenize("预热")
+
+
 @pytest.fixture()
 def conn(tmp_path):
     c = connect(tmp_path / "test.db")

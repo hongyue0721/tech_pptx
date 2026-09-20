@@ -9,6 +9,7 @@ from fastapi import FastAPI, Request, Response
 from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 
+from courseware_api.api.routes_changes import router as changes_router
 from courseware_api.api.routes_health import router as health_router
 from courseware_api.api.routes_jobs import router as jobs_router
 from courseware_api.api.routes_materials import router as materials_router
@@ -100,4 +101,5 @@ def create_app(
     app.include_router(jobs_router, prefix=API_PREFIX)
     app.include_router(materials_router, prefix=API_PREFIX)
     app.include_router(plans_router, prefix=API_PREFIX)
+    app.include_router(changes_router, prefix=API_PREFIX)
     return app

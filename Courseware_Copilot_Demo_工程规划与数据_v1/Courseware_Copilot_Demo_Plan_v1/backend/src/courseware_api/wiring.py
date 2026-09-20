@@ -8,6 +8,7 @@ from courseware_core.jobs.worker import JobHandler
 from courseware_core.llm.adapter import ChatCompletionsAdapter
 from courseware_core.llm.config import LLMConfig
 from courseware_core.models import Job, JobResultRef
+from courseware_core.services.generate_service import GenerateService
 from courseware_core.services.material_service import MaterialService
 from courseware_core.services.plan_service import PlanService
 from courseware_core.storage.database import connect
@@ -24,9 +25,10 @@ def build_worker_handlers(
     （凭据只从环境读取，不落盘）；测试注入 Fake provider 走同一代码路径。
     """
     cached_provider = plan_provider
+    cached_model_id: Optional[str] = None
 
     def resolve_provider():
-        nonlocal cached_provider
+        nonlocal cached_provider, cached_model_id
         if cached_provider is None:
             try:
                 config = LLMConfig.from_env()
@@ -35,6 +37,7 @@ def build_worker_handlers(
                     f"APP_LLM_* configuration missing or invalid: {exc}"
                 ) from exc
             cached_provider = ChatCompletionsAdapter(config)
+            cached_model_id = config.model
         return cached_provider
 
     def parse_handler(job: Job) -> JobResultRef:
@@ -53,7 +56,17 @@ def build_worker_handlers(
         finally:
             conn.close()
 
-    return {"parse": parse_handler, "plan": plan_handler}
+    def generate_handler(job: Job) -> JobResultRef:
+        conn = connect(db_path)
+        try:
+            # model_id 在 resolve_provider 后才有值；注入 Fake 时保持 None=unknown。
+            provider = resolve_provider()
+            service = GenerateService(conn, provider=provider, model_id=cached_model_id)
+            return service.handle_generate(job)
+        finally:
+            conn.close()
+
+    return {"parse": parse_handler, "plan": plan_handler, "generate": generate_handler}
 
 
 def resolve_materials_root(db_path: Path, override: Path | None) -> Path:
