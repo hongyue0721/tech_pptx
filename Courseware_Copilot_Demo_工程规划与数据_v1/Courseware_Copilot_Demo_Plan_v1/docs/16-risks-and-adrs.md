@@ -20,6 +20,8 @@ ADR-08：Skill与Web共享core但对data-dir排他。Skill采用独立demo目录
 
 ADR-09：先真实PPTX+结构预览；PPTD图/实际PPTX图等级必须标注。高保真QA能降级，但不能把降级讲成已通过视觉检查。
 
+ADR-10（2026-09-20，修订 ADR-02 的"两个路由"限制）：前端以三个业务视图（资料设置→大纲确认→课件审阅）承载同一流程，浏览器路由为 `/`（创建前）、`/project/:id/materials`、`/project/:id/outline`、`/project/:id/review`，并保留 `/project/:id` 兼容转入。业务范围没有扩大：仍是"材料→大纲→候选→提交"一条链，只是把单页拆成三页以降低单页密度与认知负担；阶段导航常驻、底部主操作固定可见。服务器状态（project/plan/change/deck）仍是唯一事实来源，路由 query 只存定位线索（plan/change/version/slide），刷新后按精确 ID 重读、不猜最新。两页面时代的 WorkspacePage 由三个业务页替代，不新增 Dashboard/设置中心/历史项目中心等后台形态。
+
 ## 开工风险表
 
 | 编号 | 风险/未知 | 优先级 | 处理/门禁 |

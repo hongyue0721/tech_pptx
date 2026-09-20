@@ -393,12 +393,11 @@
   {
     "id": "T11",
     "stage": "M3",
-    "title": "Vue教师创建与工作区",
-    "status": "PLANNED",
+    "title": "Vue 三业务页面前端（F1-F4）",
+    "status": "IN_PROGRESS",
     "depends_on": [
       "T03",
-      "T08",
-      "T10"
+      "T08"
     ],
     "read_first": [
       "docs/09-frontend.md",
@@ -416,9 +415,12 @@
       "状态轮询/刷新/错误",
       "来源Drawer/下载"
     ],
-    "constraints": "只两个路由，复用AnyUI外壳",
+    "constraints": "三业务视图（ADR-10 替代旧两路由限制）；复用 AnyUI 外壳；T10/T12 未接能力诚实禁用不造假；F00 读接口已具备",
     "owner": "鸿岳（单人主开发）",
-    "evidence": []
+    "evidence": [
+      "F1 完成（2026-09-20）：AnyUI@0.5.2 锁版本正式接入+三页路由+外壳+tokens+真实读取骨架；typecheck/build 退出码0；截图 docs/screenshots/f1/（1366×768 三页、941/1180/1440）；ADR-10 已登记",
+      "F2/F3/F4 未做：上传/确认/生成/commit/证据抽屉/可靠性矩阵"
+    ]
   },
   {
     "id": "T12",

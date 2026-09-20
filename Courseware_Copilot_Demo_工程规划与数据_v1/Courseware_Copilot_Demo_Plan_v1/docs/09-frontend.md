@@ -1,47 +1,92 @@
-# 前端规格｜Vue + AnyUI
+# 前端规格｜Vue + AnyUI（三业务页面，ADR-10）
 
 ## 1. 技术与边界
 
-Vue 3 + TypeScript + Vite + Vue Router + AnyUI；仅两个路由：`/`、`/project/:id`。不加入React、Nuxt、SSR、Pinia、富文本编辑器或画布引擎。后端是业务状态真源；前端composables负责选中页、输入框、轮询与弹层。
+Vue 3 + TypeScript + Vite + Vue Router + `@any-design/anyui@0.5.2`（npm 正式依赖，锁准确版本，不用 latest）；官方 Vue 入口 `@any-design/anyui/vue`，样式 `@any-design/anyui/styles/index.css`。不加入 React、Nuxt、SSR、Pinia、富文本编辑器或画布引擎。后端是业务状态唯一真源；前端 composables 负责选中页、输入框、轮询与弹层。
 
-AnyUI的仓库版本是0.5.2，不把它等同已发布npm版本。本包未完成安装验证。M0先检查包可获取、类型入口、CSS、Vue peer与构建；锁定实际通过版本和lockfile。新建业务工程，不克隆整个AnyUI monorepo作为应用。[S08]
+AnyUI 用于 Button/Input/Textarea/Checkbox 与 Dialog/Drawer/Toast/Progress/Tabs。个别控件用轻量本地组件替换（如 StatusTag 保证"状态不只靠颜色"、文件队列），不修改 AnyUI 源码、不为贴合组件库改业务模型。`AUpload` 只选择/派发文件不负责 HTTP；多选走原生 input multiple + 本地队列。`ASplit` 不是可拖动分栏；三栏用 CSS Grid。`AChat` 不使用（无通用会话后端）。图标与字体本地/系统，禁运行时远端 Iconify/字体/图片请求。
 
-按官方Vue入口初始化。最小样例先验证Button/Input/Drawer/Toast；全局注册可以作为Demo简化，不对包体积作未经测量的承诺。不得把上游所有React/Svelte开发依赖照搬。图标本地静态打包，禁运行时远端Iconify请求；界面字体使用本地/系统字体。
+安装说明：AnyUI 声明多框架 peers（react/svelte/iconify），Vue-only 工程安装需 `--legacy-peer-deps`（T02 smoke 结论，非 force 掩盖）；Vue 运行时 peers `@iconify/vue`、`@popperjs/core` 显式声明。
 
-## 2. 组件与页面
+## 2. 路由与三个业务视图（ADR-10）
 
-CreateProject：课题、对象、课时、4—12目标页数、教学目标、PDF队列、云模型资料处理告知。创建后进入Workspace，上传资料逐个排队；文件扩展名过滤仅是用户提示，服务器仍验证字节。
+```
+/                          IntakePage（创建前：课题表单+待提交队列）
+/project/:id/materials     IntakePage（已创建：课程只读+资料队列+解析状态）
+/project/:id/outline       OutlinePage（?plan=精确ID）
+/project/:id/review        ReviewPage（?change=…&slide=… 或 ?version=…&slide=…）
+/project/:id               兼容入口 → 按服务端状态转入 materials（不猜 plan/change）
+```
 
-Workspace：顶栏课程名/版本/导出；左栏页导航；中央大纲或页面预览；右栏AI编辑与操作结果；来源Drawer。没有正式课件时中央显示计划：教师检查可支持目标和缺口、调整标题/顺序、确认后才生成。不能先生成十页再要求用户倒过来确认计划。
+业务流程固定为「资料设置 → 大纲确认 → 课件审阅」三步，顶部轻量阶段导航 + 底部固定主操作；不是后台管理系统，无 Dashboard/设置中心/登录页/历史项目中心/模板商城。
 
-业务组件建议：`PdfDropzone`、`MaterialQueue`、`OutlineReview`、`SlideNavigator`、`SlidePreview`、`AssistantPanel`、`ChangeReview`、`EvidenceDrawer`、`JobStatus`。同一个页面通过阶段切换，不添加一堆空Dashboard。
+组件结构（frontend/src）：
 
-AnyUI `AUpload`只选择/派发文件，不负责HTTP上传；本次已读实现取第一个文件。多选用原生input multiple及自定义drop处理。`ASplit`是分割线，不是拖动分栏；三栏用CSS Grid。`AChat`仅作消息呈现，不承担工具调用、来源核验或变更提交状态。复杂操作卡自己做，不为贴合组件库改业务模型。
+```
+layouts/{CourseShell.vue, stepNav.ts}
+pages/{IntakePage, OutlinePage, ReviewPage}.vue
+components/common/StatusTag.vue（状态文字+色点，不只靠颜色）
+api/{client.ts, resources.ts}（fetch 封装：X-Request-ID、Idempotency-Key、ApiError）
+types/models.ts（与 contracts/models.schema.json 对齐，不手写第二套字段名）
+styles/{tokens.css, base.css}（FRONTEND_SPEC §2 纸页感/深靛蓝/陶色）
+```
 
-## 3. 交互闭环
+## 3. 页面规格
 
-资料导入成功显示：文件名、物理页数、可用文本页、不可用页警告、语料版本。按钮文案是“生成教学大纲”，而非立即“全自动生成完美课件”。资料缺失或全部不可解析不能开始规划。
+### A 资料设置（IntakePage）
 
-大纲确认后触发生成job，展示真实stage，无假进度百分比。完成后显示候选课件；检查通过也必须由教师点“应用此版本”。失败/依据不足时保持旧版本，不清空整页。
+两栏：左「这节课，想讲什么？」（课题/对象/课时/页数/目标/云处理告知 consent 默认 false），右「教学资料」（本地待提交队列可增删；上传逐份进行）。底部：资料状态 + 主操作。创建前按钮「保存设置并解析资料 →」；创建后课程配置只读（无 PATCH 接口就不制造"保存成功"），主操作「生成教学大纲 →」仅在全部资料 ready 且无活动 job 时可用。
 
-编辑时发送选中slide_id、base_version与corpus_revision；按钮默认精简、拆成两页、重新解释，可附自然语言。界面明确本次改哪些页。候选展示修改前后差异、知识点变化与核验状态；应用/放弃都可执行。
+上传链路（F2 接通）：创建成功返回真实 project_id 后才逐份上传；每份上传后轮询 parse job 至终态、项目写锁释放后再传下一份；不用 Promise.all 并发制造 PROJECT_BUSY；duplicate=true 显示既有文件不制造新解析任务；刷新后浏览器 File 对象失效，不谎报能续传未上传文件。
 
-撤销表现为“恢复到上一版（创建新版本）”。不让前端数组回退假装服务器已保存。导出按钮固定version，等待artifact链接；修改后旧导出显示所属旧版本，不能写“最新”。
+### B 大纲确认（OutlinePage）
 
-来源Drawer显示文件名、PDF第N页、原文摘录和claim；定位成功与语义支持分开，不能用一个绿色图标表示整页绝对正确。印刷页标签仅附加显示。结构预览显式标明，不伪装真实PPT截图。
+三栏：左教学目标与检索覆盖（supported/partial/unsupported/conflict 语义为"相关资料充分/不足/缺口/冲突"，coverage 是检索覆盖不是"事实已验证"）；中紧凑页面列表（一行一页，选中高亮）；右当前页详情（标题/purpose 编辑、布局只读展示、来源段数、上移/下移）。缺口目标不预选、不可接受 unsupported/conflict 目标。
 
-## 4. 状态和错误
+底部主操作「确认大纲并生成 →」内部严格串行：`POST confirm`（精确 plan_id、教师版 slides/accepted_goal_indices）成功 → `POST generations`。绝不绕过 confirm；已确认后失败重试生成不新建计划。URL 保留精确 plan_id，刷新重新 GET 指定 plan，不猜最新。confirmed 计划只读。
 
-建议composables：`useProject`、`useJobPolling`、`useDeckSelection`、`useCandidateChange`。每个job使用独立AbortController；卸载/换项目停止旧轮询，401停止并提示，超时只重试GET不重新POST。保留表单输入与最后成功状态。
+### C 课件审阅（ReviewPage）
 
-显示empty/loading/blocked/failed/interrupted/cancelled/ready。资料不足是blocked，不是系统崩溃。409解释版本已变化；不自动合并AI修改。选中页删除/拆分后按服务端映射跳转；禁止以数组下标当长期ID。
+三栏：左页导航；中 16:9 结构预览（语义块卡片，fact 块通过 claim_id 查 claims 字典——不存在 fact.text 字段；引用未建立显示"该条引用未建立，查看核验报告"，不白屏不静默丢页；标注「结构预览，非 PowerPoint 渲染」）+ 翻页器；右 Inspector 三 Tab（内容/依据/核验），不是常驻聊天窗，不放假的自然语言编辑输入框（T12 未接）。
 
-## 5. 布局、可访问性和测试
+候选/正式状态标签克制区分：`候选稿·未应用`、`正式版本 vN`、`候选已过期`。底部：状态与阻塞原因 + `返回大纲`、`导出 PPTX`（T10 未接=disabled+原因）、`应用此候选版本`。
 
-单主题，白/浅灰背景、深正文、蓝色强调；不启用全局液态玻璃和大面积动画。16:9课件画布与应用外壳是不同设计对象。
+## 4. CandidateChange 状态服从服务器（不前端推断）
 
-桌面参考三栏220px / minmax(0,1fr) / 340px；窄屏右栏变Drawer，不承诺手机全功能。至少在1366×768和1920×1080验收。内容区域min-width:0，避免长文件名撑开布局。
+消费 `change.status + validation.can_commit + claim_checks + unbound_assertions + warnings`：
 
-表单有label，错误可读且不只依赖颜色；可键盘操作主按钮与Drawer，关闭后恢复焦点；空态说明下一步。模型文本用Vue转义渲染，P0不用v-html。上传/提交可禁重复点击但服务端幂等仍不可少。
+- ready 且 can_commit=true：核验通过，允许教师确认后 commit；
+- blocked：显示定位失败/partial/unsupported/conflict/not_checked/unbound/warning，禁止应用；
+- stale：候选基于旧版本/旧资料，禁止应用，提示刷新重新生成；
+- committed：已应用为正式版本，不再显示"再次应用"；
+- job.succeeded 只表示执行完成，不等于可 commit。
 
-测试覆盖多PDF队列、同文件重复选择、扫描件失败、job恢复、候选应用、来源查看、拆页后选中、409、取消、导出和刷新恢复。AnyUI组件异常先在业务包装层替换，不能擅自转向修整个组件库。
+提交成功返回 DeckVersion（服务端权威 version）→ 再 `GET deck?version=N` 渲染正式 Deck；不把 CandidateChange.candidate 冒充正式版本；409 重新读基线，不乐观强改。Evidence 原文走 `GET /projects/{id}/evidence/{chunk_id}?corpus_revision=N`（服务器定位结果），前端不拼页码。
+
+## 5. 状态管理与异步规则
+
+不引 Pinia。composables：`useProject`、`useJobPolling`、（F2/F3 扩展 materials/plan/change/deck/evidence）。URL 存定位状态（projectId/plan/change/version/slide）；服务器数据为事实来源；刷新按精确 ID 恢复。
+
+同一路由组件内 params/query 变化：abort 上一请求、带 epoch 防旧回包覆盖新状态；轮询前台 2s、后台 5s、串行 setTimeout（上一请求未完成不叠下一轮）、终态即停、组件卸载 AbortController 清理。GET 重试与 POST 幂等重试分开；网络错误不自动重发模型生成。受理 202 立即把 job_id 写入 URL。
+
+## 6. 错误显示（按错误码给动作，不统一"操作失败"）
+
+PDF_TEXT_UNAVAILABLE→换文本型 PDF；PDF_ENCRYPTED→暂不支持加密 PDF；INSUFFICIENT_EVIDENCE→补充资料或调整目标；CORPUS_CHANGED→资料已变化请刷新重新规划；VERSION_CONFLICT→版本已更新请刷新继续；CONSENT_REQUIRED→确认云处理告知后重新创建；PROJECT_BUSY→等待当前任务完成。错误详情不显示 API Key、服务器绝对路径、供应商原始敏感响应。
+
+## 7. 布局与响应式（一屏原则）
+
+固定外壳 `grid-template-rows: 62px 60px minmax(0,1fr) 66px`（100dvh）；分栏祖先 min-height/width:0。验收尺寸 1440×900、1366×768、1180×740、941×768（CSS px）：顶部导航、主内容、底部主操作在视口内可见；允许列表/文件队列/Drawer 内部滚动；不全局缩字号、不 overflow:hidden 裁内容、不隐藏功能。
+
+- ≥1180：审阅三栏（174px / minmax(0,1fr) / ~295–300px）；
+- <1080：右 Inspector 与大纲目标列转可开合抽屉（按钮开、×关），中央内容优先；
+- <760 或高倍缩放：允许纵向重排与页面滚动，操作与内容不丢失。
+
+## 8. 可访问性与文案
+
+键盘可达（Tab 顺序、焦点可见 outline、抽屉 Escape 关闭并回焦）；阶段导航 aria-current="step"；结构预览 aria-label；状态不只靠颜色。文案教育工具语气：说明能做什么与为什么阻塞，不夸大（"自动核验通过，建议教师复核"，不写"100% 正确"）。模型文本用 Vue 转义渲染，P0 不用 v-html。
+
+## 9. 施工状态与真值
+
+F1（已完成）：AnyUI 正式接入、三页路由、外壳、视觉 tokens、真实 GET project/materials/plan/change/deck 读取骨架；未接写入操作一律诚实 disabled+原因，生产代码路径无 mock 数据（演示数据只允许出现在测试 fixture）。截图见 docs/screenshots/f1/（1366×768 三页、941×768 review、1440×900 materials、1180×740 review）。
+
+F2：资料队列上传+parse 轮询+plans/confirm/generations 串行。F3：候选核验渲染、commit、deck、Evidence Drawer。F4：可靠性矩阵（UI_TEST_MATRIX）。每轮同步 api.md/OpenAPI/Schema/前端类型/契约测试（仅契约真实变化时）与 process.md/tasks.json。
