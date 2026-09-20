@@ -59,6 +59,13 @@ class DeckNotFound(DomainError):
         super().__init__("DECK_NOT_FOUND", "deck version not found", details)
 
 
+class EvidenceNotFound(DomainError):
+    """F00 evidence 读接口：chunk 不属于该项目或不在所请求的累积 revision 内。"""
+
+    def __init__(self, details: Optional[dict] = None):
+        super().__init__("EVIDENCE_NOT_FOUND", "evidence chunk not found", details)
+
+
 class ArtifactNotFound(DomainError):
     def __init__(self, details: Optional[dict] = None):
         super().__init__("ARTIFACT_NOT_FOUND", "artifact not found", details)

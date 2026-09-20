@@ -1,6 +1,6 @@
 # api｜HTTP接口契约 v1.0.0
 
-规范文件：`contracts/openapi.json`；数据类型：`contracts/models.schema.json`。本文件说明业务语义；三者和代码必须同次变更。这里是待实现契约，不代表服务已启动。
+规范文件：`contracts/openapi.json`；数据类型：`contracts/models.schema.json`。本文件说明业务语义；三者和代码必须同次变更。路由实现状态以 `process.md` 当前记录为准：T04–T09 与 F00 只读接口（deck/evidence）已挂载；previews/exports/artifacts/edits/restores 仍为目标契约，未挂载前不对外提供。
 
 ## 通用约定
 
@@ -26,12 +26,12 @@
 | POST /projects/{project_id}/generations | GenerateRequest | 202 JobAccepted | 必须已确认计划；产出候选，不直接更新当前版本 |
 | GET /jobs/{job_id} | 路径 | 200 Job | status与stage分开 |
 | POST /jobs/{job_id}/cancel | 无 | 200 Job | 协作式取消 |
-| GET /projects/{project_id}/deck | ?version=N | 200 DeckSpec | 缺省读当前版本；没有正式版本404 DECK_NOT_FOUND |
+| GET /projects/{project_id}/deck | ?version=N | 200 DeckSpec | 缺省读当前版本；没有正式版本或version<1按"不存在"处理返回404 DECK_NOT_FOUND（不作422）|
 | POST /projects/{project_id}/edits | EditRequest | 202 JobAccepted | 必带base_version/corpus_revision；输出候选 |
 | GET /projects/{project_id}/changes/{change_id} | 路径 | 200 CandidateChange | 候选DeckSpec、差异、验证报告 |
 | POST /projects/{project_id}/changes/{change_id}/commit | CommitRequest | 201 DeckVersion | 教师确认后原子应用 |
 | POST /projects/{project_id}/restores | RestoreRequest | 201 DeckVersion | 从旧版本复制产生新版本 |
-| GET /projects/{project_id}/evidence/{chunk_id} | ?corpus_revision=N | 200 DocumentChunk | 原文与页码；仅当前项目可读 |
+| GET /projects/{project_id}/evidence/{chunk_id} | ?corpus_revision=N | 200 DocumentChunk | 原文与页码；仅当前项目可读；chunk须落在所请求累积revision内，超前revision返回409 CORPUS_CHANGED |
 | GET /projects/{project_id}/versions/{version}/previews | 路径 | 200 PreviewManifest | 每页类型与ready/failed，永不串版 |
 | POST /projects/{project_id}/exports | ExportRequest | 202 JobAccepted | 固定version；纯渲染，不重新推理 |
 | GET /projects/{project_id}/artifacts/{artifact_id}/download | 路径 | 200 binary | Content-Type、Content-Disposition、校验和 |
@@ -71,7 +71,7 @@ PreviewManifest标 `source_type=pptd_render|pptx_render|outline`。outline只是
 | code | HTTP | 可重试/行为 |
 |---|---:|---|
 | UNAUTHORIZED | 401 | 重新验证，不重发模型 |
-| PROJECT_NOT_FOUND / DECK_NOT_FOUND / ARTIFACT_NOT_FOUND / PLAN_NOT_FOUND / CHANGE_NOT_FOUND | 404 | 检查ID |
+| PROJECT_NOT_FOUND / DECK_NOT_FOUND / ARTIFACT_NOT_FOUND / PLAN_NOT_FOUND / CHANGE_NOT_FOUND / EVIDENCE_NOT_FOUND | 404 | 检查ID；EVIDENCE_NOT_FOUND=chunk不存在/不属该项目/不在所请求累积revision内 |
 | PAYLOAD_TOO_LARGE / PAGE_LIMIT_EXCEEDED | 413 | 缩减资料 |
 | UNSUPPORTED_FILE / PDF_ENCRYPTED / PDF_TEXT_UNAVAILABLE | 422 | 换可解析资料 |
 | VALIDATION_ERROR / EDIT_UNSUPPORTED | 422 | 修改请求 |
