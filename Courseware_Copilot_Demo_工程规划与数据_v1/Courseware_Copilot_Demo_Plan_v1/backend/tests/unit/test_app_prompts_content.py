@@ -88,3 +88,20 @@ def test_audit_prompt_states_output_structure():
     assert version == "audit-v2", "补结构样例必须升版本（R00-A）"
     assert '"audited_slide_ids"' in body and '"unbound_assertions"' in body
     assert '"field_path"' in body and '"slide_id"' in body
+
+
+def test_edit_prompt_states_decision_protocol_and_structure():
+    # T12 loop④：EditDecision 是本服务自定义协议，"decision/proposal/reason/
+    # unsupported" 字面量与三分流（proposal/unsupported/missing_evidence）
+    # 必须锁死，防止改版把拒答通道写丢（api.md:59 两类不能混淆）。
+    version, body = load_system_prompt("edit", REPO_ROOT / "app-prompts")
+    assert version == "edit-v2", "输出协议改 EditDecision 必须升版本（R00-A）"
+    for literal in ('"decision"', '"proposal"', '"unsupported"', '"reason"'):
+        assert literal in body, f"EditDecision 协议字面量 {literal} 必须出现"
+    assert '"operations"' in body and '"summary"' in body
+    assert '"missing_evidence"' in body, "缺口通道必须显式保留，不得被 unsupported 吞并"
+    for op in ('"replace_slide"', '"split_slide"', '"reorder_slides"'):
+        assert op in body, f"允许操作字面量 {op} 必须列全"
+    assert '"direct"' in body and '"derived"' in body, (
+        "claim.kind 枚举字面值必须显式给出（content.md 同款实锤教训）"
+    )

@@ -60,7 +60,9 @@ from courseware_core.models import (
 )
 from courseware_core.retrieval.bm25 import search_chunks
 from courseware_core.retrieval.context import select_evidence_within_budget
+from courseware_core.services.claim_verdicts import map_verdicts, verdicts_to_checks
 from courseware_core.services.coverage_service import TOP_K
+from courseware_core.services.edit_patch import relations_valid
 from courseware_core.services.generate_messages import (
     audit_messages,
     content_messages,
@@ -89,7 +91,7 @@ def new_change_id() -> str:
     return f"chg_{secrets.token_hex(16)}"
 
 
-def _canonical_sha(payload) -> str:
+def canonical_sha(payload) -> str:
     text = json.dumps(payload, sort_keys=True, ensure_ascii=False, separators=(",", ":"))
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
@@ -248,48 +250,9 @@ class GenerateService:
                 checks_map, dup_ids, batch_unbound, raw_sha, extra_ids = batch_verdicts
                 verdict_hashes.append(raw_sha)
                 unbound.extend(batch_unbound)
-                if extra_ids:
-                    # 严格双射（AGENT_00-Q03）：verdict 造新 claim ID=答复失控，
-                    # 整批核验不可信——全部 not_checked，不采信其余"正常"条目。
-                    for c in located:
-                        claim_checks.append(
-                            ClaimVerification(
-                                claim_id=c.id, locator_status="located",
-                                semantic_status="not_checked",
-                                reason=(
-                                    "semantic verdicts contained unknown claim ids: "
-                                    + ",".join(sorted(extra_ids)[:5])
-                                )[:600],
-                            )
-                        )
-                else:
-                    for c in located:
-                        if c.id in dup_ids:
-                            claim_checks.append(
-                                ClaimVerification(
-                                    claim_id=c.id, locator_status="located",
-                                    semantic_status="not_checked",
-                                    reason="semantic model returned duplicate verdicts for this claim",
-                                )
-                            )
-                            continue
-                        v = checks_map.get(c.id)
-                        if v is None:
-                            # 漏答不得跳过变绿：记 not_checked → 门自然不过。
-                            claim_checks.append(
-                                ClaimVerification(
-                                    claim_id=c.id, locator_status="located",
-                                    semantic_status="not_checked",
-                                    reason="semantic model returned no verdict for this claim",
-                                )
-                            )
-                        else:
-                            claim_checks.append(
-                                ClaimVerification(
-                                    claim_id=c.id, locator_status="located",
-                                    semantic_status=v.status, reason=v.reason,
-                                )
-                            )
+                claim_checks.extend(
+                    verdicts_to_checks(located, checks_map, dup_ids, extra_ids)
+                )
             # 独立可见文字审计（循环①Q01）：与 claim 语义核验分离，零 claim 批
             # 也必须过；豁免判据=教师计划 layout=title，模型自报 title 不算豁免。
             batch_audit = self._audit_batch(
@@ -371,7 +334,7 @@ class GenerateService:
             model_id=self._model_id,
             prompt_version=f"{content_ver}+{verify_ver}+{audit_ver}",
             checked_at=_now_iso(),
-            raw_result_sha256=_canonical_sha(verdict_hashes) if verdict_hashes else None,
+            raw_result_sha256=canonical_sha(verdict_hashes) if verdict_hashes else None,
             unbound_assertions=unbound[:64],
         )
         change = CandidateChange(
@@ -502,23 +465,10 @@ class GenerateService:
         verdicts = provider.complete_json(
             "verify_claims", "SemanticVerdicts", messages, context
         ).value
-        checks_map = {}
-        duplicate_ids: set[str] = set()
-        expected = {c.id for c in located}
-        extra_ids: set[str] = set()
-        for c in verdicts.checks:
-            if c.claim_id not in expected:
-                extra_ids.add(c.claim_id)
-                continue
-            if c.claim_id in checks_map:
-                # "每个 claim_id 恰好一次"（verify.md）：重复答复=该 claim 的
-                # 核验不可信，整条记 not_checked（T09-Review B2：不得保留
-                # 首条把 unsupported 盖成 supported）。
-                checks_map.pop(c.claim_id)
-                duplicate_ids.add(c.claim_id)
-                continue
-            checks_map[c.claim_id] = c
-        raw_sha = _canonical_sha(verdicts.model_dump(mode="json"))
+        checks_map, duplicate_ids, extra_ids = map_verdicts(
+            verdicts, {c.id for c in located}
+        )
+        raw_sha = canonical_sha(verdicts.model_dump(mode="json"))
         return checks_map, duplicate_ids, list(verdicts.unbound_assertions), raw_sha, extra_ids
 
     def _audit_batch(self, job, batch, batch_slides, located, provider, context,
@@ -551,16 +501,8 @@ class GenerateService:
 
     @staticmethod
     def _relations_valid(slides, claims) -> bool:
-        claim_ids = [c.id for c in claims]
-        slide_ids = [s.id for s in slides]
-        if len(claim_ids) != len(set(claim_ids)) or len(slide_ids) != len(set(slide_ids)):
-            return False
-        known = set(claim_ids)
-        for s in slides:
-            for b in s.blocks:
-                if b.type == "fact" and b.claim_id not in known:
-                    return False
-        return True
+        # T12：真值迁入 edit_patch.relations_valid，生成/编辑共用一份实现。
+        return relations_valid(slides, claims)
 
     @staticmethod
     def _summary(deck: DeckSpec, report: ValidationReport) -> str:

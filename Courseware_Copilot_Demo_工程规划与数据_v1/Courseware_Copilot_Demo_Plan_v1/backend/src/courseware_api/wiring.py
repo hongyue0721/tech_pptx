@@ -9,6 +9,7 @@ from courseware_core.llm.adapter import ChatCompletionsAdapter
 from courseware_core.llm.config import LLMConfig
 from courseware_core.models import Job, JobResultRef
 from courseware_core.services.generate_service import GenerateService
+from courseware_core.services.edit_service import EditService
 from courseware_core.services.material_service import MaterialService
 from courseware_core.services.plan_service import PlanService
 from courseware_core.storage.database import connect
@@ -66,7 +67,27 @@ def build_worker_handlers(
         finally:
             conn.close()
 
-    return {"parse": parse_handler, "plan": plan_handler, "generate": generate_handler}
+    def edit_handler(job: Job) -> JobResultRef:
+        conn = connect(db_path)
+        try:
+            # 确定性 reorder 不外发模型：provider 只经 factory 惰性解析（loop④），
+            # 无 APP_LLM_* 环境下确定性路径也必须可执行。N-5：provider 与
+            # model_id 必须同源解析（与 generate_handler 口径一致），
+            # 预注入 Fake 时 resolve_provider 原样返回、model_id=None=unknown。
+            service = EditService(
+                conn,
+                provider_factory=lambda: (resolve_provider(), cached_model_id),
+            )
+            return service.handle_edit(job)
+        finally:
+            conn.close()
+
+    return {
+        "parse": parse_handler,
+        "plan": plan_handler,
+        "generate": generate_handler,
+        "edit": edit_handler,
+    }
 
 
 def resolve_materials_root(db_path: Path, override: Path | None) -> Path:

@@ -63,6 +63,22 @@ class EditProposal(ContractModel):
     missing_evidence: list[MissingEvidenceNote] = Field(default_factory=list, max_length=16)
 
 
+class EditProposalOutcome(ContractModel):
+    decision: Literal["proposal"]
+    proposal: EditProposal
+
+
+class EditUnsupportedOutcome(ContractModel):
+    decision: Literal["unsupported"]
+    reason: str = Field(min_length=1, max_length=300)
+
+
+EditDecision = Annotated[
+    Union[EditProposalOutcome, EditUnsupportedOutcome],
+    Field(discriminator="decision"),
+]
+
+
 class SemanticCheck(ContractModel):
     claim_id: str = Field(min_length=1, max_length=128)
     status: Literal["supported", "partial", "unsupported", "conflict"]

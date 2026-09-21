@@ -1,6 +1,6 @@
 # api｜HTTP接口契约 v1.0.0
 
-规范文件：`contracts/openapi.json`；数据类型：`contracts/models.schema.json`。本文件说明业务语义；三者和代码必须同次变更。路由实现状态以 `process.md` 当前记录为准：T04–T09 与 F00 只读接口（deck/evidence）已挂载；T12 restores 已挂载；previews/exports/artifacts/edits 仍为目标契约，未挂载前不对外提供。
+规范文件：`contracts/openapi.json`；数据类型：`contracts/models.schema.json`。本文件说明业务语义；三者和代码必须同次变更。路由实现状态以 `process.md` 当前记录为准：T04–T09 与 F00 只读接口（deck/evidence）已挂载；T12 edits/restores 已挂载；previews/exports/artifacts 仍为目标契约，未挂载前不对外提供。
 
 ## 通用约定
 
@@ -52,11 +52,13 @@ GenerateRequest必须含plan_id、corpus_revision、base_version（首轮为0）
 
 ## 编辑
 
-EditRequest含instruction、target_slide_ids、base_version、corpus_revision。允许意图：精简、重述、拆页；重新排序可走同一路径的deterministic action，不能臆造新事实。模型内部输出DeckPatch，由后端应用到副本。
+EditRequest含instruction、target_slide_ids、base_version、corpus_revision。允许意图：精简、重述、拆页；重新排序可走同一路径的deterministic action，不能臆造新事实。模型内部输出EditDecision（判分联合：`{"decision":"proposal","proposal":EditProposal}` 或 `{"decision":"unsupported","reason":...}`），proposal.operations由后端确定性应用到副本；split的新页ID由服务器重派，模型ID仅作临时引用。
 
-split_slide要给完整替换页内容，不是只写一个“split”操作名就算实现。非目标页的语义hash必须不变。不得修改未授权的claim：共享claim被重写需新ID，避免影响其他页。
+确定性reorder语法（负责人2026-09-21拍板）：instruction为JSON对象且含action字段时进入确定性路径，目前仅接受`{"action":"reorder","slide_ids":[...slide_ids须为当前全部页ID的排列]}`；action未知或slide_ids非全量置换属受理期可判定的不支持；不匹配该语法的输入视为自由文本走模型路径，后端不做词面猜测。确定性路径不外发模型内容，不受consent门；自由文本路径受理期先过云处理告知门。
 
-不支持指令返回422 EDIT_UNSUPPORTED；资料不足job=blocked、code=INSUFFICIENT_EVIDENCE；模型/网络错误job=failed。两类不能混淆。
+split_slide要给完整替换页内容，不是只写一个"split"操作名就算实现。非目标页的语义hash必须不变。不得修改未授权的claim：共享claim被重写需新ID，避免影响其他页。
+
+不支持指令分两级（负责人2026-09-21拍板细化）：受理期可判定的（目标页不存在于base版本、结构化action未知、reorder非全量置换）返回同步422 EDIT_UNSUPPORTED；模型判定意图超允许的（换课题/删整册等）job=failed、error.code=EDIT_UNSUPPORTED。资料不足job=blocked、code=INSUFFICIENT_EVIDENCE；模型/网络错误job=failed。三类不能混淆。
 
 ## 版本/导出
 

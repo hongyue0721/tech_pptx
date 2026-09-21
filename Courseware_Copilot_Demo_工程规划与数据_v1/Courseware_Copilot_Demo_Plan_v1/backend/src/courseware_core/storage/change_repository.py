@@ -34,6 +34,27 @@ class ChangeRepository:
         request_id: Optional[str] = None,
         on_committed: Optional[Callable[[sqlite3.Connection], None]] = None,
     ) -> None:
+        self.create_write_job(
+            project_id,
+            kind="generate",
+            job_id=job_id,
+            corpus_revision=corpus_revision,
+            params_json=params_json,
+            request_id=request_id,
+            on_committed=on_committed,
+        )
+
+    def create_write_job(
+        self,
+        project_id: str,
+        *,
+        kind: str,
+        job_id: str,
+        corpus_revision: int,
+        params_json: str,
+        request_id: Optional[str] = None,
+        on_committed: Optional[Callable[[sqlite3.Connection], None]] = None,
+    ) -> None:
         now = _now_iso()
         deadline_at = (
             datetime.now(timezone.utc)
@@ -59,11 +80,12 @@ class ChangeRepository:
                 "INSERT INTO jobs (id, project_id, kind, status, stage, cancel_requested,"
                 " base_version, corpus_revision, result_ref, error, llm_calls, request_id,"
                 " deadline_at, params_json, created_at, updated_at)"
-                " VALUES (?, ?, 'generate', 'queued', 'queued', 0, ?, ?, NULL, NULL,"
+                " VALUES (?, ?, ?, 'queued', 'queued', 0, ?, ?, NULL, NULL,"
                 " 0, ?, ?, ?, ?, ?)",
                 (
                     job_id,
                     project_id,
+                    kind,
                     proj["current_version"],
                     corpus_revision,
                     request_id,

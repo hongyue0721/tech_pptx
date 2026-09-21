@@ -188,3 +188,13 @@ class ChangeNotCommittable(DomainError):
         super().__init__(
             "CHANGE_NOT_COMMITTABLE", "candidate change is not committable", details
         )
+
+
+class EditUnsupported(DomainError):
+    """受理期可判定的不支持编辑（api.md:59，负责人拍板细化）：目标页不存在于
+    base 版本、结构化指令的 action 不在确定性集合、reorder 非全量置换——
+    这些无需模型即可判定，同步 422；自由文本的意图判定在模型路径。"""
+
+    def __init__(self, message: str = "edit instruction or targets unsupported",
+                 details: Optional[dict] = None):
+        super().__init__("EDIT_UNSUPPORTED", message, details)

@@ -10,7 +10,7 @@ import courseware_api.dev as dev
 def test_build_dev_app_wires_all_handlers_and_worker(tmp_path):
     app = dev.build_dev_app(db_path=tmp_path / "dev.db")
     assert app.state.worker is not None
-    assert set(app.state.worker._handlers) == {"parse", "plan", "generate"}
+    assert set(app.state.worker._handlers) == {"parse", "plan", "generate", "edit"}
     app.state.worker._release_singleton_lock()
 
 

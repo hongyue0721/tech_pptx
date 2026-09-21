@@ -2041,6 +2041,44 @@
       ],
       "additionalProperties": false
     },
+    "EditDecision": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "decision": {
+              "const": "proposal"
+            },
+            "proposal": {
+              "$ref": "#/$defs/EditProposal"
+            }
+          },
+          "required": [
+            "decision",
+            "proposal"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "decision": {
+              "const": "unsupported"
+            },
+            "reason": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 300
+            }
+          },
+          "required": [
+            "decision",
+            "reason"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
     "SemanticVerdicts": {
       "type": "object",
       "properties": {

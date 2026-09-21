@@ -4,6 +4,7 @@ from typing import Iterator
 from fastapi import Depends, Request
 
 from courseware_core.services.generate_service import GenerateService
+from courseware_core.services.edit_service import EditService
 from courseware_core.services.idempotency_service import IdempotencyService
 from courseware_core.services.job_service import JobService
 from courseware_core.services.material_service import MaterialService
@@ -72,3 +73,10 @@ def get_restore_service(
     conn: sqlite3.Connection = Depends(get_conn),
 ) -> RestoreService:
     return RestoreService(conn)
+
+
+def get_edit_service(
+    conn: sqlite3.Connection = Depends(get_conn),
+) -> EditService:
+    # 受理期不调模型；provider 在 worker handler 注入（wiring），与 plan/generate 同口径。
+    return EditService(conn)

@@ -19,7 +19,7 @@ import time
 from typing import Any, Callable, Optional, Sequence
 
 import httpx
-from pydantic import BaseModel, ValidationError
+from pydantic import BaseModel, TypeAdapter, ValidationError
 
 from courseware_core.errors import (
     BudgetExceeded,
@@ -35,6 +35,7 @@ from courseware_core.errors import (
 )
 from courseware_core.models import (
     ContentProposal,
+    EditDecision,
     PlanProposal,
     SemanticVerdicts,
     VisibleTextAudit,
@@ -44,11 +45,13 @@ from .budget import BudgetExceededError, CancelledError, DeadlineExceededError, 
 from .config import RETRY_AFTER_CAP_SECONDS, TRANSIENT_BACKOFF_SECONDS, LLMConfig
 
 # 模型输出提案Schema注册表：模型只填提案类型，存储/HTTP类型不进此表（docs/18）。
-OUTPUT_SCHEMAS = {
+OUTPUT_SCHEMAS: dict[str, Any] = {
     "PlanProposal": PlanProposal,
     "ContentProposal": ContentProposal,
     "SemanticVerdicts": SemanticVerdicts,
     "VisibleTextAudit": VisibleTextAudit,
+    # EditDecision 是判别联合（Annotated），类没有 model_validate，须走 TypeAdapter。
+    "EditDecision": TypeAdapter(EditDecision),
 }
 
 TEMPORARY_STATUS_CODES = {429, 500, 502, 503, 504}
@@ -305,8 +308,10 @@ class ChatCompletionsAdapter:
         content = message.get("content")
         return content if isinstance(content, str) else None
 
-    def _validate(self, content: str, model: type[BaseModel]) -> BaseModel:
+    def _validate(self, content: str, model: Any) -> BaseModel:
         parsed = json.loads(content)
+        if isinstance(model, TypeAdapter):
+            return model.validate_python(parsed)
         return model.model_validate(parsed)
 
     @staticmethod

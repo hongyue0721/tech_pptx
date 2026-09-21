@@ -416,6 +416,23 @@ SAMPLES: dict[str, list[dict]] = {
             "missing_evidence": [],
         }
     ],
+    "EditDecision": [
+        {
+            "decision": "proposal",
+            "proposal": {
+                "operations": [
+                    {"op": "reorder_slides", "slide_ids": ["sld_001"]}
+                ],
+                "claims": [],
+                "summary": "重排。",
+                "missing_evidence": [],
+            },
+        },
+        {
+            "decision": "unsupported",
+            "reason": "要求更换课题，超出局部编辑意图集。",
+        },
+    ],
     "SemanticVerdicts": [
         {
             "checks": [

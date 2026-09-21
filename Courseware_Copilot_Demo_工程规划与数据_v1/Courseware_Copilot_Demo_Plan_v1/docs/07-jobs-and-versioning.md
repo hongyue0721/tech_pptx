@@ -24,6 +24,8 @@ FastAPI启动时创建单后台工作器，从SQLite领取queued job；SQLite事
 
 生成及AI编辑返回candidate_change_id和报告。教师查看候选后POST commit，服务端再次确认base_version与corpus_revision，并检查门禁。事务内分配vN+1并更新current_version。失败只丢弃候选，不影响当前可用版本。
 
+编辑候选（T12）与生成候选同表同读路径；validation.claim_checks只覆盖本次新增claim——确定性reorder不新增claim故为空集（内容未变，生成时核验仍成立），模型编辑仅对新增claim重烧语义核验，未变更既有claim沿用并在warnings中如实声明，不伪造"全量重核验"。编辑job三分流：模型判意图超允许=failed+EDIT_UNSUPPORTED、资料缺=blocked+INSUFFICIENT_EVIDENCE、模型/网络错=failed（api.md §编辑）。
+
 渲染/导出发生在版本提交后；失败时可以从同一版本重新export，不重新调用模型、也不增加Deck版本。
 
 ## 5. 撤销与恢复
