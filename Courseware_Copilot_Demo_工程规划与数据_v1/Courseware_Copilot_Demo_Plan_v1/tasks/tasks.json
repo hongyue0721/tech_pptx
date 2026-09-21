@@ -430,7 +430,7 @@
     "id": "T12",
     "stage": "M3",
     "title": "受限编辑、拆页与恢复",
-    "status": "PLANNED",
+    "status": "IN_PROGRESS",
     "depends_on": [
       "T09"
     ],
@@ -453,7 +453,12 @@
     ],
     "constraints": "保留旧版本，模型不改current",
     "owner": "鸿岳（单人主开发）",
-    "evidence": []
+    "evidence": [
+      "restores 后端 commit 47291d7：POST 201 新 DeckVersion（restored_from 溯源/同 corpus 否则 409 CORPUS_CHANGED/PROJECT_BUSY 写锁门/acknowledged 422/幂等重放），unit7+contract10 先红后绿",
+      "edits 后端 commit 6f4f20c：结构化确定性 reorder+受理门两级 EDIT_UNSUPPORTED（负责人 2026-09-21 拍板入 api.md）+DeckPatch 构造性非目标不变引擎+EditDecision 输出契约（schema/samples/OUTPUT_SCHEMAS/edit.md v2）+模型路径复用 T09 可信链与 guard_writable；61 条先红后绿，615 collected exit 0、validate 23/23",
+      "独立 Review+轻量复审（干净会话，模型 huaweicloud/qwen3.8-flash 标注）：B1 guard_writable+N1-N5 当场红→绿闭环、复审放行、N6/N7 补闭环，报告 docs/reviews/t12-backend-review.md",
+      "真实模型 edit 链路 NOT_RUN（无当轮授权，归 T14）；前端消费与浏览器五态验证=loop⑤ 进行中"
+    ]
   },
   {
     "id": "T13",

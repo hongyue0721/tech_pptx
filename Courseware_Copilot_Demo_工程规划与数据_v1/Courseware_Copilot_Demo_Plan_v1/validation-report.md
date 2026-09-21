@@ -1,13 +1,13 @@
 # 规划包静态校验报告
 
-时间：2026-09-21T11:01:12.845850+00:00
+时间：2026-09-21T14:12:17.576405+00:00
 范围：**PACK_STATIC_ONLY**。通过23项，失败0项。
 
 这只验证文档/契约/生成的测试资产，不表示应用、模型、码道或PPTX链路已通过。
 
 | 检查 | 结果 | 实际检查内容 |
 |---|---|---|
-|JSON Schema definitions and references|PASS|48 definitions, internal refs resolve|
+|JSON Schema definitions and references|PASS|49 definitions, internal refs resolve|
 |OpenAPI and api.md route consistency|PASS|21 route operations, parameters/responses/local refs checked (not full external OpenAPI conformance certification)|
 |Schema sample: demo-data/lesson_request.json|PASS||
 |Schema sample: contracts/examples/create_project.json|PASS||

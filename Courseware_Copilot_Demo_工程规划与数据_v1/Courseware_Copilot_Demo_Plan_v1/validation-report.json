@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-21T11:01:12.845850+00:00",
+  "generated_at": "2026-09-21T14:12:17.576405+00:00",
   "scope": "PACK_STATIC_ONLY",
   "passed": 23,
   "failed": 0,
@@ -8,7 +8,7 @@
       "check": "JSON Schema definitions and references",
       "category": "PACK_STATIC",
       "status": "PASS",
-      "detail": "48 definitions, internal refs resolve"
+      "detail": "49 definitions, internal refs resolve"
     },
     {
       "check": "OpenAPI and api.md route consistency",
