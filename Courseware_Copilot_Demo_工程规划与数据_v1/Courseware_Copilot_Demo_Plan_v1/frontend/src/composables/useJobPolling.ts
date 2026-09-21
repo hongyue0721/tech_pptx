@@ -5,6 +5,8 @@
 import { onScopeDispose, ref, watch, type Ref } from "vue";
 
 import { ApiError } from "../api/client";
+import { describeError } from "../api/errorMessages";
+import { cancelJobKey } from "../api/idempotency";
 import { jobsApi } from "../api/resources";
 import type { Job, JobStatus } from "../types/models";
 
@@ -39,6 +41,7 @@ export function useJobPolling(jobId: Ref<string | null>, options: JobPollingOpti
   const settledJob = ref<Job | null>(null);
   const pollError = ref<string | null>(null);
   const isPolling = ref(false);
+  const cancelling = ref(false);
 
   let epoch = 0;
   let timer: ReturnType<typeof setTimeout> | null = null;
@@ -72,6 +75,7 @@ export function useJobPolling(jobId: Ref<string | null>, options: JobPollingOpti
       if (isTerminalJob(latest)) {
         isPolling.value = false;
         clearTimer();
+        cancelling.value = false;
         settledJob.value = latest;
         options.onSettled?.(latest);
         return;
@@ -115,6 +119,7 @@ export function useJobPolling(jobId: Ref<string | null>, options: JobPollingOpti
       job.value = null;
       settledJob.value = null;
       pollError.value = null;
+      cancelling.value = false;
       if (id === null || id === "") return;
       const myEpoch = epoch;
       isPolling.value = true;
@@ -122,6 +127,21 @@ export function useJobPolling(jobId: Ref<string | null>, options: JobPollingOpti
     },
     { immediate: true },
   );
+
+  // 协作式取消：POST cancel 只是"请求取消"（200 Job），UI 不自行判终态——
+  // 保持轮询直到服务器返回 cancelled 等终态；失败返回教师文案由消费者展示。
+  async function requestCancel(): Promise<string | null> {
+    const id = jobId.value;
+    if (id === null || id === "" || cancelling.value || !isPolling.value) return null;
+    cancelling.value = true;
+    try {
+      await jobsApi.cancel(id, cancelJobKey(id));
+      return null;
+    } catch (err) {
+      cancelling.value = false;
+      return err instanceof ApiError ? describeError(err).message : String(err);
+    }
+  }
 
   function onVisibility(): void {
     const id = jobId.value;
@@ -142,5 +162,5 @@ export function useJobPolling(jobId: Ref<string | null>, options: JobPollingOpti
     stop();
   });
 
-  return { job, settledJob, pollError, isPolling, stop };
+  return { job, settledJob, pollError, isPolling, cancelling, requestCancel, stop };
 }

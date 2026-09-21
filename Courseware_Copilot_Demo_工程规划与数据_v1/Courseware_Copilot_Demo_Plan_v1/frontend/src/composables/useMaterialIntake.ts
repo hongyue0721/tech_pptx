@@ -77,8 +77,26 @@ export function useMaterialIntake(projectId: Ref<string | null>) {
   }
 
   async function handleSettled(job: Job): Promise<void> {
+    if (job.kind === "generate") {
+      // 兼容入口/刷新后在资料页恢复的 generate job：终态按服务器 result_ref 真值走。
+      syncJobToUrl(null);
+      if (job.status === "succeeded" && job.result_ref?.type === "change") {
+        await router.push({
+          name: "review",
+          params: { id: job.project_id },
+          query: { change: job.result_ref.id },
+        });
+        return;
+      }
+      jobNotice.value = describeJobFailure(job);
+      return;
+    }
     if (job.kind !== "plan") {
       syncJobToUrl(null);
+      // 恢复路径（URL/服务器 active job）的 parse 终态：列表必须重读服务器真值，
+      // 否则刷新时取到的 parsing/queued 旧态会一直赖在卡片上（Review B1）。
+      // 正常上传路径由 runUploadLoop 兜底刷新，此处多刷一次幂等 GET 无害。
+      if (job.kind === "parse") await loadMaterials();
       return;
     }
     generating.value = false;
@@ -285,6 +303,8 @@ export function useMaterialIntake(projectId: Ref<string | null>) {
     job: polling.job,
     pollError: polling.pollError,
     isPolling: polling.isPolling,
+    cancelling: polling.cancelling,
+    requestCancel: polling.requestCancel,
     readyCount,
     failedCount,
     allReady,

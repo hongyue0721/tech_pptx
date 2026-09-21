@@ -30,12 +30,19 @@ const {
   job,
   pollError,
   isPolling,
+  cancelling,
+  requestCancel,
   readyCount,
   failedCount,
   allReady,
   busy,
   canGenerateOutline,
 } = intake;
+
+async function handleCancel(): Promise<void> {
+  const msg = await requestCancel();
+  if (msg !== null) materialsError.value = msg;
+}
 
 // 创建前表单（真实提交，校验与后端一致：topic/audience 必填、goals≤8、页数4-12）
 const topic = ref("");
@@ -279,6 +286,14 @@ const createDisabledTitle = computed(() => {
         </AButton>
       </template>
       <template v-else>
+        <AButton
+          v-if="isPolling"
+          :disabled="cancelling"
+          :title="cancelling ? '取消请求已提交，等待服务器进入终态' : '请求取消当前任务（协作式，等待服务器终态）'"
+          @click="handleCancel"
+        >
+          {{ cancelling ? "取消中…" : "取消任务" }}
+        </AButton>
         <AButton
           type="primary"
           :disabled="!canGenerateOutline"

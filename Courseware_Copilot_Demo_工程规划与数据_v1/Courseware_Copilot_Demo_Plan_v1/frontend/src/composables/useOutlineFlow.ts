@@ -214,6 +214,8 @@ export function useOutlineFlow(
     job: polling.job,
     pollError: polling.pollError,
     isPolling: polling.isPolling,
+    cancelling: polling.cancelling,
+    requestCancel: polling.requestCancel,
     isConfirmed,
     isStale,
     readOnly,

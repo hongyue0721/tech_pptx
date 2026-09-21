@@ -50,9 +50,15 @@ const flow = useOutlineFlow(
 );
 const {
   editedSlides, acceptedGoals, reviewed, confirming, generating, flowError, job, pollError, isPolling,
+  cancelling, requestCancel,
   isConfirmed, isStale, readOnly,
   goalAcceptable, isGoalAccepted, toggleGoal,
 } = flow;
+
+async function handleCancel(): Promise<void> {
+  const msg = await requestCancel();
+  if (msg !== null) flowError.value = msg;
+}
 
 const selectedSlide = computed<PlanSlide | null>(
   () => editedSlides.value[selectedIndex.value] ?? null,
@@ -266,6 +272,14 @@ const primaryTitle = computed(() => {
         <span>我已逐页审阅大纲</span>
       </label>
       <AButton :disabled="!plan" @click="goMaterials">返回资料</AButton>
+      <AButton
+        v-if="isPolling"
+        :disabled="cancelling"
+        :title="cancelling ? '取消请求已提交，等待服务器进入终态' : '请求取消当前任务（协作式，等待服务器终态）'"
+        @click="handleCancel"
+      >
+        {{ cancelling ? "取消中…" : "取消任务" }}
+      </AButton>
       <AButton
         type="primary"
         :disabled="primaryDisabled"
