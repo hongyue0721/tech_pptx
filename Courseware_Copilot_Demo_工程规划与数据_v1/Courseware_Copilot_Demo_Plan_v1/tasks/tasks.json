@@ -457,7 +457,10 @@
       "restores 后端 commit 47291d7：POST 201 新 DeckVersion（restored_from 溯源/同 corpus 否则 409 CORPUS_CHANGED/PROJECT_BUSY 写锁门/acknowledged 422/幂等重放），unit7+contract10 先红后绿",
       "edits 后端 commit 6f4f20c：结构化确定性 reorder+受理门两级 EDIT_UNSUPPORTED（负责人 2026-09-21 拍板入 api.md）+DeckPatch 构造性非目标不变引擎+EditDecision 输出契约（schema/samples/OUTPUT_SCHEMAS/edit.md v2）+模型路径复用 T09 可信链与 guard_writable；61 条先红后绿，615 collected exit 0、validate 23/23",
       "独立 Review+轻量复审（干净会话，模型 huaweicloud/qwen3.8-flash 标注）：B1 guard_writable+N1-N5 当场红→绿闭环、复审放行、N6/N7 补闭环，报告 docs/reviews/t12-backend-review.md",
-      "真实模型 edit 链路 NOT_RUN（无当轮授权，归 T14）；前端消费与浏览器五态验证=loop⑤ 进行中"
+      "真实模型 edit 链路 NOT_RUN（无当轮授权，归 T14）；前端消费见下条 loop⑤",
+      "loop⑤ 前端消费（2026-09-21 工作区段）：EditPanel/SlideMoveControls/VersionHistoryPanel/useEditFlow+types/resources/idempotency 接线；浏览器真实链 PASS（下移→候选→应用→v3→恢复 v1→v4 semantic_hash 一致→重构回归 v5），截图 docs/screenshots/t12/ 3 张；轻量复审（模型 huaweicloud/qwen3.8-flash）0 阻塞+8 项清单全 PASS（N1/N2/N3/Q1/Q3/Q4/Q6 闭环，N4/Q5 进 backlog）",
+      "两真 bug 修复：①EditPanel 受理载荷曾取展示 deck 快照值非服务器真值→真实点击 409 CORPUS_CHANGED（纪律：受理门参数必取 project 真值）；②commit_change 不重算结构致 F3 轮构造候选（42 claims 仅 18 唯一 ID）入库、demo 项目 ccbb… v1 损坏——修复=CAS 前加 relations_valid 重算门+TestStructuralRecheck 反例锁死；committed 版本不可变保持原样",
+      "事故如实登记：带凭据 dev 后端跑浏览器验证时自由文本负向探针触发计划外真实模型调用 2 次（job_c85eef… failed+EDIT_UNSUPPORTED，模型判词与拍板一致）；第二自由文本 job 恰被 ghost 指针挡在 queued（llm_calls=0）经合法 cancel API 转 cancelled、ghost 指针清理 rowcount=1；教训=负向探针不得打带凭据后端；门禁 pytest 617 collected exit 0/typecheck/build/validate 23/23"
     ]
   },
   {
