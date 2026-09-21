@@ -420,7 +420,8 @@
     "evidence": [
       "F1 完成（2026-09-20）：AnyUI@0.5.2 锁版本正式接入+三页路由+外壳+tokens+真实读取骨架；typecheck/build 退出码0；截图 docs/screenshots/f1/（1366×768 三页、941/1180/1440）；ADR-10 已登记",
       "F2 完成（2026-09-20）：真实资料→解析→大纲→候选全链浏览器验收 PASS（deepseek-flash 当轮授权：plan 1 调用+generate 10 调用，42 claims 40 supported/2 partial→候选诚实 blocked 不盖绿）；截图 docs/screenshots/f2/（4 张）；真实调用暴露并修复 prompt 三处契约字面错位（content-v3/verify-v2/audit-v2，防退化测试锁死），527 全绿",
-      "F3/F4 未做：候选审阅/commit/证据抽屉/deck 读取/可靠性矩阵"
+      "F3 完成（2026-09-21）：核验报告（gate/留痕/问题前置/折叠/unbound+reason/warnings=missing_evidence）+依据按页+EvidenceDrawer（码点偏移+quote 校验+409 诚实报错）+commit 链（服从服务器、稳定幂等键、201→重读、409→重读基线、committed/stale/discarded 文案一致）+版本切换；五态浏览器 PASS（ready/409 为 dev 构造态留痕）；export/preview/edit 零请求；typecheck/build/pytest530/validate23-23 全绿；截图 docs/screenshots/f3/ 6 张；独立 Review（模型 huaweicloud/qwen3.8-flash 标注）1 阻塞+6 非阻塞，B1/N1-N5 闭环、N6 进 backlog，报告 docs/reviews/t11-f3-review.md",
+      "F4 未做：UI_TEST_MATRIX 四尺寸+941 抽屉、前端独立 code review、iconify 远程图标离线化评估"
     ]
   },
   {
