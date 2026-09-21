@@ -15,7 +15,7 @@ AnyUI 用于 Button/Input/Textarea/Checkbox 与 Dialog/Drawer/Toast/Progress/Tab
 /project/:id/materials     IntakePage（已创建：课程只读+资料队列+解析状态）
 /project/:id/outline       OutlinePage（?plan=精确ID）
 /project/:id/review        ReviewPage（?change=…&slide=… 或 ?version=…&slide=…）
-/project/:id               兼容入口 → 按服务端状态转入 materials（不猜 plan/change）
+/project/:id               兼容入口 → WorkspaceEntry 按服务器真值转入：active_job_id 非空→materials（页面恢复链跟踪）；无活动任务且 current_version≥1→review?version=N（真值参数）；否则→materials（不猜 plan/change id）
 ```
 
 业务流程固定为「资料设置 → 大纲确认 → 课件审阅」三步，顶部轻量阶段导航 + 底部固定主操作；不是后台管理系统，无 Dashboard/设置中心/登录页/历史项目中心/模板商城。
@@ -69,6 +69,8 @@ styles/{tokens.css, base.css}（FRONTEND_SPEC §2 纸页感/深靛蓝/陶色）
 
 同一路由组件内 params/query 变化：abort 上一请求、带 epoch 防旧回包覆盖新状态；轮询前台 2s、后台 5s、串行 setTimeout（上一请求未完成不叠下一轮）、终态即停、组件卸载 AbortController 清理。GET 重试与 POST 幂等重试分开；网络错误不自动重发模型生成。受理 202 立即把 job_id 写入 URL。
 
+任务取消（D-06）：轮询进行中（isPolling）资料页/大纲页显示"取消任务"，点击 POST /jobs/{id}/cancel（稳定幂等键 cancelJobKey(jobId)，同 job 重试同键）；200 仅表示取消已受理（协作式），UI 不自行判终态、继续轮询等待服务器 cancelled，期间按钮呈"取消中…"禁用；对已终态 job 取消返回 200 现态、无害。
+
 ## 6. 错误显示（按错误码给动作，不统一"操作失败"）
 
 PDF_TEXT_UNAVAILABLE→换文本型 PDF；PDF_ENCRYPTED→暂不支持加密 PDF；INSUFFICIENT_EVIDENCE→补充资料或调整目标；CORPUS_CHANGED→资料已变化请刷新重新规划；VERSION_CONFLICT→版本已更新请刷新继续；CONSENT_REQUIRED→确认云处理告知后重新创建；PROJECT_BUSY→等待当前任务完成。错误详情不显示 API Key、服务器绝对路径、供应商原始敏感响应。
@@ -96,3 +98,5 @@ F3（已完成，2026-09-21）：候选核验渲染、commit、deck、Evidence D
 F4（已完成，2026-09-21）：UI_TEST_MATRIX 1440×900/1366×768/1180×740 三页+941×768 Inspector 抽屉截图 11 张（docs/screenshots/f4/，console 0 错误）；**远程图标消除的实际手段=main.ts 去 `app.use(AnyUI)` 全量注册、组件纯具名导入**（根因：AMessage.install 无条件 loadIcons 预取 4 个 Iconify 图标；三页零外部请求实证 network-zero-external.md）；压力可访问性=真实 8 目标+超长标题（emoji/扩展汉字）+5 份不同 PDF 逐份真实解析，双面板内部滚动+主 CTA 可见实测。**契约事实**：target_slides 服务端上限 12（16 被 VALIDATION_ERROR 拒），12 页全量 deck 压力需真实模型生成未再授权=该项 PARTIAL（滚动机制已验）。矩阵执行中抓到并修复**后端并发 500 生产 bug**（sqlite 连接跨线程交接：uvicorn 线程池+依赖 teardown；修复=check_same_thread=False+threadsafety==3 运行时断言，backend/tests/unit/test_database_thread_safety.py 回归锁，534 全绿）。独立 Review（模型 huaweicloud/qwen3.8-flash 标注）1 阻塞+3 非阻塞全当场闭环。T10/T12 能力（导出/预览/编辑）仍未接：无请求、无假 Blob、按钮 disabled+原因。
 
 每轮同步 api.md/OpenAPI/Schema/前端类型/契约测试（仅契约真实变化时）与 process.md/tasks.json。
+
+收尾轮（D-04/D-06，2026-09-21 负责人放行后闭环）：兼容入口 WorkspaceEntry 按服务器真值转入（active_job_id→materials、current_version≥1→review?version、否则 materials；不猜 plan/change）；cancel UI（两页轮询中"取消任务"→POST 200 受理→等服务器终态，"取消中…"态；API 层 live 实测 PASS，UI 点击全链因 parse 亚秒窗口如实 PARTIAL、T14 generate 补验）；materials 页 generate/blocked 终态按 result_ref 跳审阅看报告；Review B1（parse 恢复终态后 loadMaterials 刷新）修复并可控时序实证。报告 docs/reviews/t11-entry-cancel-review.md。
