@@ -10,6 +10,7 @@ from courseware_core.services.material_service import MaterialService
 from courseware_core.services.plan_service import PlanService
 from courseware_core.services.project_service import ProjectService
 from courseware_core.services.read_service import ProjectReadService
+from courseware_core.services.restore_service import RestoreService
 from courseware_core.storage.database import connect
 from courseware_core.storage.idempotency_repository import IdempotencyRepository
 from courseware_core.storage.job_repository import JobRepository
@@ -65,3 +66,9 @@ def get_read_service(
 ) -> ProjectReadService:
     # F00 只读服务：不注入 provider，任何路径都不触模型。
     return ProjectReadService(conn)
+
+
+def get_restore_service(
+    conn: sqlite3.Connection = Depends(get_conn),
+) -> RestoreService:
+    return RestoreService(conn)

@@ -1,6 +1,6 @@
 # api｜HTTP接口契约 v1.0.0
 
-规范文件：`contracts/openapi.json`；数据类型：`contracts/models.schema.json`。本文件说明业务语义；三者和代码必须同次变更。路由实现状态以 `process.md` 当前记录为准：T04–T09 与 F00 只读接口（deck/evidence）已挂载；previews/exports/artifacts/edits/restores 仍为目标契约，未挂载前不对外提供。
+规范文件：`contracts/openapi.json`；数据类型：`contracts/models.schema.json`。本文件说明业务语义；三者和代码必须同次变更。路由实现状态以 `process.md` 当前记录为准：T04–T09 与 F00 只读接口（deck/evidence）已挂载；T12 restores 已挂载；previews/exports/artifacts/edits 仍为目标契约，未挂载前不对外提供。
 
 ## 通用约定
 
