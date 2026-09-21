@@ -60,6 +60,29 @@ export function commitKey(projectId: string, changeId: string): string {
   return stableKey("commit", projectId, changeId);
 }
 
+export function editKey(
+  projectId: string,
+  baseVersion: number,
+  corpusRevision: number,
+  payloadCanonical: string,
+): string {
+  // 无 attempt 维度：409/422 失败时服务端占位已回滚，同键重试即重新执行
+  //（api.md §通用）；教师改配置由 payloadCanonical/base 变化自然换键，
+  // 与 restoreKey 策略一致（T12 Review N3：双策略矛盾不留债）。
+  // baseVersion/corpusRevision 通常也含于 payloadCanonical，此处显式入键
+  // 是冗余防御：防止调用方构造载荷时漏放 base 字段导致跨版本键碰撞。
+  return stableKey("edit", projectId, baseVersion, corpusRevision, payloadCanonical);
+}
+
+export function restoreKey(
+  projectId: string,
+  targetVersion: number,
+  baseVersion: number,
+  corpusRevision: number,
+): string {
+  return stableKey("restore", projectId, targetVersion, baseVersion, corpusRevision);
+}
+
 export function cancelJobKey(jobId: string): string {
   return stableKey("cancel", jobId);
 }

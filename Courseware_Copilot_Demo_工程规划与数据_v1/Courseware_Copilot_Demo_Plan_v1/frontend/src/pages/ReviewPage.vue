@@ -7,11 +7,15 @@ import { ApiError, api } from "../api/client";
 import { describeError } from "../api/errorMessages";
 import { commitKey } from "../api/idempotency";
 import { changesApi, deckApi } from "../api/resources";
+import EditPanel from "../components/review/EditPanel.vue";
 import EvidenceDrawer from "../components/review/EvidenceDrawer.vue";
 import EvidencePanel from "../components/review/EvidencePanel.vue";
+import SlideMoveControls from "../components/review/SlideMoveControls.vue";
 import ValidationPanel from "../components/review/ValidationPanel.vue";
+import VersionHistoryPanel from "../components/review/VersionHistoryPanel.vue";
 import StatusTag from "../components/common/StatusTag.vue";
 import CourseShell from "../layouts/CourseShell.vue";
+import { useEditFlow } from "../composables/useEditFlow";
 import { useEscapeClose } from "../composables/useEscapeClose";
 import type {
   CandidateChange,
@@ -51,6 +55,36 @@ const version = computed(() => {
   const v = Number(route.query.version);
   return Number.isInteger(v) && v >= 1 ? v : null;
 });
+
+function gotoQuery(patch: Record<string, string | number | null>): Promise<unknown> {
+  const query: Record<string, string> = {};
+  for (const [k, v] of Object.entries({ ...route.query, ...patch })) {
+    if (v !== null && v !== undefined && v !== "") query[k] = String(v);
+  }
+  return router.push({ name: "review", params: { id: props.id }, query });
+}
+
+// T12：编辑/移动 job 流程（URL ?job= 驱动、终态消耗、受理门）收敛在
+// useEditFlow；isCandidate/version 声明提前到本行之后，用 getter 惰性读取。
+const editFlow = useEditFlow({
+  routeQueryJob: () => route.query.job as string | undefined,
+  isCandidateView: () => isCandidate.value,
+  project,
+  versionView: () => version.value,
+  gotoQuery,
+});
+const {
+  editJobError,
+  isPolling: editPolling,
+  cancelling: editCancelling,
+  requestCancel: requestEditCancel,
+  onAccepted: onEditAccepted,
+  onRestored,
+  baseVersion: editBaseVersion,
+  corpusRevision: editCorpusRevision,
+  disabledReason: editDisabledReason,
+  allowed: editAllowed,
+} = editFlow;
 
 const currentDeck = computed<DeckSpec | null>(() =>
   version.value !== null ? deck.value : change.value?.candidate ?? null,
@@ -321,8 +355,27 @@ const footerText = computed(() => {
             @click="selectedIndex += 1"
           >下一页 ›</button>
         </div>
+        <div v-if="editAllowed && currentDeck" class="edit-zone">
+          <h3 class="edit-zone-title">AI 局部编辑（候选确认流程）</h3>
+            <EditPanel
+              :project-id="props.id"
+              :slides="currentDeck.slides"
+              :base-version="editBaseVersion"
+              :corpus-revision="editCorpusRevision"
+              :disabled="!editAllowed"
+              :disabled-reason="editDisabledReason"
+              @accepted="onEditAccepted"
+            />
+        </div>
         <p class="preview-note">结构预览（语义块布局），非 PowerPoint 渲染效果。</p>
         <p v-if="applyError" class="apply-error" role="alert">应用未成功：{{ applyError }}</p>
+        <p v-if="editJobError" class="apply-error" role="alert">{{ editJobError }}</p>
+        <div v-if="editPolling" class="edit-tracking" role="status">
+          <span>编辑任务处理中（每页改动都会先经服务器核验成为候选）…</span>
+          <button type="button" :disabled="editCancelling" @click="requestEditCancel">
+            {{ editCancelling ? "取消请求中…" : "取消编辑" }}
+          </button>
+        </div>
       </section>
 
       <aside
@@ -357,6 +410,9 @@ const footerText = computed(() => {
               <template v-else>{{ b.text }}</template>
             </p>
           </template>
+          <p v-if="editAllowed && currentDeck" class="ins-hint">
+            本页编辑入口在课件区下方「AI 局部编辑」面板；移动与版本恢复在课件区操作。
+          </p>
         </div>
         <div v-else-if="activeTab === 'evidence'" class="tab-body">
           <EvidencePanel :slide="selectedSlide" :claims="currentDeck?.claims ?? []" @open-evidence="openEvidence" />
@@ -364,6 +420,16 @@ const footerText = computed(() => {
         <div v-else class="tab-body">
           <ValidationPanel v-if="change && isCandidate" :change="change" />
           <p v-else class="ins-hint">正式版本没有独立核验报告；核验结论以生成时的候选记录为准。</p>
+        </div>
+        <div v-if="activeTab === 'content' && currentDeck" class="tab-extra">
+          <SlideMoveControls
+            v-if="editAllowed"
+            :project="project"
+            :slides="currentDeck.slides"
+            :corpus-revision="editCorpusRevision"
+            @accepted="onEditAccepted"
+          />
+          <VersionHistoryPanel :project="project" @restored="onRestored" />
         </div>
       </aside>
     </div>
@@ -396,6 +462,41 @@ const footerText = computed(() => {
 </template>
 
 <style scoped>
+.edit-zone {
+  border-top: 1px solid var(--cc-border);
+  margin-top: 10px;
+  padding-top: 10px;
+}
+.edit-zone-title {
+  font-size: var(--cc-font-aux);
+  color: var(--cc-ink-weak);
+  margin: 0 0 8px;
+}
+.edit-tracking {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  border: 1px solid var(--cc-border);
+  border-radius: var(--cc-radius-control);
+  padding: 8px 12px;
+  margin-top: 8px;
+  font-size: var(--cc-font-aux);
+  color: var(--cc-ink-weak);
+}
+.edit-tracking button {
+  border: 1px solid var(--cc-border-strong);
+  border-radius: var(--cc-radius-control);
+  background: var(--cc-panel);
+  color: var(--cc-ink);
+  font: inherit;
+  padding: 4px 10px;
+  cursor: pointer;
+}
+.edit-tracking button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
 .review-grid {
   height: 100%;
   display: grid;

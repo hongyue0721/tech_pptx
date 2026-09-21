@@ -281,3 +281,17 @@ export interface CommitRequest {
   corpus_revision: number;
   acknowledged: true;
 }
+
+export interface EditRequest {
+  instruction: string;
+  target_slide_ids: string[];
+  base_version: number;
+  corpus_revision: number;
+}
+
+export interface RestoreRequest {
+  target_version: number;
+  base_version: number;
+  corpus_revision: number;
+  acknowledged: true;
+}

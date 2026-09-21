@@ -5,6 +5,7 @@ import type {
   DeckSpec,
   DeckVersion,
   DocumentChunk,
+  EditRequest,
   GenerateRequest,
   Job,
   JobAccepted,
@@ -12,6 +13,7 @@ import type {
   ConfirmPlanRequest,
   MaterialList,
   MaterialUploadAccepted,
+  RestoreRequest,
 } from "../types/models";
 
 const enc = encodeURIComponent;
@@ -115,4 +117,20 @@ export const evidenceApi = {
       `/projects/${enc(projectId)}/evidence/${enc(chunkId)}?corpus_revision=${corpusRevision}`,
       { signal },
     ),
+};
+
+export const editsApi = {
+  create: (projectId: string, body: EditRequest, idempotencyKey: string) =>
+    request<JobAccepted>("POST", `/projects/${enc(projectId)}/edits`, {
+      body,
+      idempotencyKey,
+    }),
+};
+
+export const restoresApi = {
+  create: (projectId: string, body: RestoreRequest, idempotencyKey: string) =>
+    request<DeckVersion>("POST", `/projects/${enc(projectId)}/restores`, {
+      body,
+      idempotencyKey,
+    }),
 };
