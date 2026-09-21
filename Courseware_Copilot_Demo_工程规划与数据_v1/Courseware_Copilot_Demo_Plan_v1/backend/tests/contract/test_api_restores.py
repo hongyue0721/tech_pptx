@@ -192,11 +192,24 @@ class TestRestoreRoute:
     def test_restore_active_job_409_project_busy(self, client_db):
         client, conn = client_db
         project_id = seed_project_with_two_versions(client, conn)
+        # busy 测试须构造真实在途 job：代码路径不产生指向终态的幽灵指针
+        #（worker finalize 与释锁同事务），指针即锁口径与 create_write_job CAS 一致。
         with conn:
+            conn.execute(
+                "INSERT INTO jobs (id, project_id, kind, status, stage, cancel_requested,"
+                " base_version, corpus_revision, result_ref, error, llm_calls, request_id,"
+                " created_at, updated_at)"
+                " VALUES ('job_busy', ?, 'generate', 'running', 'queued', 0, 2, 1,"
+                " NULL, NULL, 0, NULL, '2026-09-21T00:00:00+00:00',"
+                " '2026-09-21T00:00:00+00:00')",
+                (project_id,),
+            )
+            assert conn.execute("SELECT changes() AS n").fetchone()["n"] == 1
             conn.execute(
                 "UPDATE projects SET active_job_id = 'job_busy' WHERE id = ?",
                 (project_id,),
             )
+            assert conn.execute("SELECT changes() AS n").fetchone()["n"] == 1
         r = client.post(
             f"/api/v1/projects/{project_id}/restores",
             json=restore_body(),

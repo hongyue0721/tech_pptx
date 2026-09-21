@@ -122,8 +122,18 @@ def test_restore_across_corpus_rejected(service, seeded, conn):
 def test_restore_with_active_job_raises_project_busy(service, seeded, conn, project_columns):
     with conn:
         conn.execute(
+            "INSERT INTO jobs (id, project_id, kind, status, stage, cancel_requested,"
+            " base_version, corpus_revision, result_ref, error, llm_calls, request_id,"
+            " created_at, updated_at)"
+            " VALUES ('job_001', 'prj_001', 'generate', 'running', 'queued', 0, 2, 1,"
+            " NULL, NULL, 0, NULL, '2026-09-21T00:00:00+00:00',"
+            " '2026-09-21T00:00:00+00:00')"
+        )
+        assert conn.execute("SELECT changes() AS n").fetchone()["n"] == 1
+        conn.execute(
             "UPDATE projects SET active_job_id = 'job_001' WHERE id = 'prj_001'"
         )
+        assert conn.execute("SELECT changes() AS n").fetchone()["n"] == 1
     with pytest.raises(ProjectBusy):
         service.restore("prj_001", restore_request(target=1, base=2))
     assert project_columns("prj_001")["current_version"] == 2

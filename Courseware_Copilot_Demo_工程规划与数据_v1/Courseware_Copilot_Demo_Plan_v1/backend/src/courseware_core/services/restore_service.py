@@ -9,9 +9,11 @@ from courseware_core.storage.version_repository import VersionRepository
 
 
 class RestoreService:
-    """同步写路径：与生成/提交共享同一条项目写锁语义（docs/07 §3），
-    有在途写任务时拒绝 restore（PROJECT_BUSY），避免与 worker 提交交错；
-    并发正确性由 commit_version 的 base/corpus CAS 兜底。"""
+    """同步写路径：与生成/编辑共享"指针即锁"单一事实（docs/07 §3）——
+    worker finalize/interrupted 恢复均在终态迁移同事务释锁，代码路径不产生
+    指向终态的指针，受理期无需查 job 状态（T12 Review N2：单点状态感知会与
+    create_write_job CAS、前端 busy 判定口径分裂）。并发正确性由
+    commit_version 的 base/corpus CAS 兜底。"""
 
     def __init__(self, conn: sqlite3.Connection):
         self._projects = ProjectRepository(conn)

@@ -155,10 +155,21 @@ class TestAcceptanceGates:
             )
 
     def test_active_job_raises_project_busy(self, seeded, conn):
+        # 在途态 job 才构成 busy（与 restore 同一业务事实口径）。
         with conn:
             conn.execute(
-                "UPDATE projects SET active_job_id = 'job_other' WHERE id = 'prj_001'"
+                "INSERT INTO jobs (id, project_id, kind, status, stage, cancel_requested,"
+                " base_version, corpus_revision, result_ref, error, llm_calls, request_id,"
+                " created_at, updated_at)"
+                " VALUES ('job_001', 'prj_001', 'generate', 'running', 'queued', 0, 1, 1,"
+                " NULL, NULL, 0, NULL, '2026-09-21T00:00:00+00:00',"
+                " '2026-09-21T00:00:00+00:00')"
             )
+            assert conn.execute("SELECT changes() AS n").fetchone()["n"] == 1
+            conn.execute(
+                "UPDATE projects SET active_job_id = 'job_001' WHERE id = 'prj_001'"
+            )
+            assert conn.execute("SELECT changes() AS n").fetchone()["n"] == 1
         with pytest.raises(ProjectBusy):
             EditService(conn).create_edit_job("prj_001", edit_request("精简", ["s1"]))
 
