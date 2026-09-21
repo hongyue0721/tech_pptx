@@ -567,6 +567,15 @@ class GenerateService:
                 {"change_id": change_id, "status": change.status,
                  "can_commit": change.validation.can_commit}
             )
+        if not relations_valid(change.candidate.slides, change.candidate.claims):
+            # 存储报告是生成时刻的历史声明；commit 以当前真值重算候选结构
+            # （ID 唯一性/fact 引用可解析），声明与事实矛盾即拒绝——demo 库
+            # v1 带重复 claim ID 正是"构造候选报告字段为真、结构实际损坏、
+            # commit 只信字段"放行的实锤教训（2026-09-21 T12 浏览器轮暴露）。
+            raise ChangeNotCommittable(
+                {"change_id": change_id,
+                 "reason": "candidate deck fails structural recheck"}
+            )
         if (request.base_version != change.base_version
                 or request.corpus_revision != change.corpus_revision):
             raise VersionConflict(

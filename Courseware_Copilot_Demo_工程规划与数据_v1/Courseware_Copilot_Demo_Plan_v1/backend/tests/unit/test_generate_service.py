@@ -1257,3 +1257,58 @@ class TestCandidateWriteGuard:
             service.handle_generate(job)
         n = conn.execute("SELECT COUNT(*) c FROM changes").fetchone()["c"]
         assert n == 0
+
+
+class TestStructuralRecheck:
+    def test_cross_batch_duplicate_claim_ids_blocked(self, conn):
+        # 回归锁（2026-09-21 T12 浏览器轮实锤教训）：模型跨批复用临时 claim
+        # ID（c1×2 不同内容）时，relations 门与 full_coverage 门必须拦成
+        # blocked——demo 库中 committed v1 带重复 ID 即构造候选绕过本门的
+        # 历史产物，本测试锁死真实生成路径不可复现。
+        # 4 页=2 批（BATCH_SLIDES_MAX=3）；两批 claim 均可定位（chk1/QUOTE1，
+        # 仅 text 不同），拦截责任唯一落在重复 ID 门上。
+        seed_confirmed_plan(conn, slides=plan_slides(4))
+        job = make_generate_job(conn, "job_dup")
+        first = multi_proposal([("ps1", "clm1"), ("ps2", "clm2"), ("ps3", "clm3")])
+        second = multi_proposal([("ps4", "clm1")])
+        second.claims[0].text = "第二批复用第一批临时 ID。"
+        provider = ScriptedProvider(
+            {"generate_content": [first, second],
+             "verify_claims": [verdicts("clm1", "clm2", "clm3"), verdicts("clm1")],
+             "audit_visible_text": [
+                 audit_pass("ps1", "ps2", "ps3"), audit_pass("ps4")]}
+        )
+        ref = GenerateService(conn, provider=provider).handle_generate(job)
+        change = ChangeRepository(conn).get(ref.id)
+        assert change.status == "blocked"
+        # 门语义钉死：relations 必须检出跨批重复 ID（此前该形态被"同 ID 异
+        # 内容互相掩盖"绕过——locator 丢弃时 dangling 引用假通过）。
+        assert change.validation.relations_valid is False
+        assert change.validation.can_commit is False
+
+    def test_commit_recomputes_structure_and_rejects_broken_candidate(self, conn):
+        # commit 不信任存储报告字段：候选 deck 结构（claim/slide ID 唯一性、
+        # fact 引用可解析）在提交时按当前真值重算；矛盾=不可提交。
+        seed_confirmed_plan(conn)
+        change_id = _ready_change_id(conn)
+        row = conn.execute(
+            "SELECT change_json FROM changes WHERE id = ?", (change_id,)
+        ).fetchone()
+        payload = json.loads(row["change_json"])
+        dup_claim = dict(payload["candidate"]["claims"][0])
+        dup_claim["text"] = "与首条同 ID 但内容不同的注入 claim。"
+        payload["candidate"]["claims"].append(dup_claim)
+        _insert(
+            conn,
+            "UPDATE changes SET change_json = ? WHERE id = ?",
+            json.dumps(payload, ensure_ascii=False), change_id,
+        )
+        service = GenerateService(conn)
+        with pytest.raises(ChangeNotCommittable):
+            service.commit_change(
+                "prj1", change_id,
+                CommitRequest(base_version=0, corpus_revision=1, acknowledged=True),
+            )
+        assert conn.execute(
+            "SELECT COUNT(*) c FROM deck_versions"
+        ).fetchone()["c"] == 0
