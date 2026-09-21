@@ -4,10 +4,21 @@ import { computed, onBeforeUnmount, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 
 import { ApiError, api } from "../api/client";
+import { describeError } from "../api/errorMessages";
+import { commitKey } from "../api/idempotency";
 import { changesApi, deckApi } from "../api/resources";
+import EvidenceDrawer from "../components/review/EvidenceDrawer.vue";
+import EvidencePanel from "../components/review/EvidencePanel.vue";
+import ValidationPanel from "../components/review/ValidationPanel.vue";
 import StatusTag from "../components/common/StatusTag.vue";
 import CourseShell from "../layouts/CourseShell.vue";
-import type { CandidateChange, DeckSpec, Project } from "../types/models";
+import type {
+  CandidateChange,
+  CommitRequest,
+  DeckSpec,
+  EvidenceSpan,
+  Project,
+} from "../types/models";
 
 const props = defineProps<{ id: string }>();
 const route = useRoute();
@@ -20,6 +31,8 @@ const loadError = ref("");
 const activeTab = ref<"content" | "evidence" | "checks">("content");
 const inspectorOpen = ref(false);
 const selectedIndex = ref(0);
+const evidenceOpen = ref(false);
+const evidenceSpan = ref<EvidenceSpan | null>(null);
 let controller: AbortController | null = null;
 let epoch = 0;
 
@@ -49,6 +62,7 @@ const changeState = computed(() => {
     return { tone: "ready" as const, label: "核验通过 · 未应用" };
   if (st === "committed") return { tone: "ready" as const, label: "已应用为正式版本" };
   if (st === "stale") return { tone: "pending" as const, label: "候选已过期" };
+  if (st === "discarded") return { tone: "pending" as const, label: "候选已丢弃" };
   return { tone: "failed" as const, label: "候选未通过核验" };
 });
 
@@ -58,6 +72,70 @@ const canApply = computed(
     change.value.validation.can_commit === true &&
     version.value === null,
 );
+
+const applying = ref(false);
+const applyError = ref("");
+
+const applyDisabledReason = computed(() => {
+  const ch = change.value;
+  if (!ch) return "当前没有可应用的候选";
+  if (ch.status === "committed") return "该候选已应用为正式版本";
+  if (ch.status === "stale") return "候选基线已过期，请重新生成后再确认";
+  if (ch.status === "discarded") return "候选已被丢弃，不可应用";
+  if (ch.status !== "ready") return "候选未通过服务器核验，不可应用";
+  if (!ch.validation.can_commit) return "存在未获服务器支持的事实，不可应用";
+  if (version.value !== null) return "正在查看正式版本，切回候选视图后可应用";
+  return "";
+});
+
+async function applyChange(): Promise<void> {
+  const ch = change.value;
+  if (!ch || !canApply.value || applying.value) return;
+  applying.value = true;
+  applyError.value = "";
+  const body: CommitRequest = {
+    base_version: ch.base_version,
+    corpus_revision: ch.corpus_revision,
+    acknowledged: true,
+  };
+  try {
+    const dv = await changesApi.commit(props.id, ch.id, body, commitKey(props.id, ch.id));
+    // 不乐观改写本地状态：跳转正式版本视图后由 load() 从服务器重读 change/deck。
+    await router.push({
+      name: "review",
+      params: { id: props.id },
+      query: { change: ch.id, version: dv.version },
+    });
+  } catch (err) {
+    applyError.value = describeError(err).message;
+    // 409=基线/语料/候选态冲突：重读服务器真值，不强改本地 current_version。
+    if (err instanceof ApiError && err.status === 409) {
+      await load();
+    }
+  } finally {
+    applying.value = false;
+  }
+}
+
+const maxVersion = computed(() => project.value?.current_version ?? 0);
+
+function gotoVersion(v: number): void {
+  if (v < 1 || v > maxVersion.value || v === version.value) return;
+  void router.push({
+    name: "review",
+    params: { id: props.id },
+    query: { ...route.query, version: v },
+  });
+}
+
+// evidence 读取锚定"当前展示对象"自身的语料基线：候选视图=candidate.corpus_revision，
+// 正式视图=deck.corpus_revision（URL 残留 change 时不得把新正式版本锚回旧候选 revision）。
+const evidenceRevision = computed(() => currentDeck.value?.corpus_revision ?? null);
+
+function openEvidence(span: EvidenceSpan): void {
+  evidenceSpan.value = span;
+  evidenceOpen.value = true;
+}
 
 async function load(): Promise<void> {
   epoch += 1;
@@ -91,7 +169,11 @@ async function load(): Promise<void> {
   }
 }
 
-watch([() => props.id, changeId, version], () => void load(), { immediate: true });
+// 路由参数变化=新上下文：清掉上一次应用尝试的临时提示（409 内部直接 load() 重读不误清）。
+watch([() => props.id, changeId, version], () => {
+  applyError.value = "";
+  void load();
+}, { immediate: true });
 onBeforeUnmount(() => controller?.abort());
 
 watch(currentDeck, (d) => {
@@ -103,7 +185,10 @@ function goOutline(): void {
 }
 
 const footerText = computed(() => {
+  // footer 只呈现服务器态；应用失败的临时提示在 stage 区独立展示。
   if (loadError.value) return loadError.value;
+  if (change.value?.status === "committed") return "该候选已应用为正式版本";
+  if (change.value?.status === "stale") return "候选基线已过期，请基于最新正式版本重新生成";
   if (change.value && changeState.value?.label === "候选未通过核验") {
     return "存在未通过核验的事实，保留当前正式版本；可在右侧查看原因";
   }
@@ -149,6 +234,21 @@ const footerText = computed(() => {
             {{ changeState?.label }}
           </StatusTag>
           <StatusTag v-else tone="ready">正式版本 v{{ currentDeck.version }}</StatusTag>
+          <div v-if="version !== null" class="ver-nav" aria-label="正式版本切换">
+            <button
+              type="button"
+              :disabled="version <= 1"
+              aria-label="上一版本"
+              @click="gotoVersion(version - 1)"
+            >‹</button>
+            <span>v{{ version }} / v{{ maxVersion }}</span>
+            <button
+              type="button"
+              :disabled="version >= maxVersion"
+              aria-label="下一版本"
+              @click="gotoVersion(version + 1)"
+            >›</button>
+          </div>
           <button
             type="button"
             class="narrow-only inspector-toggle"
@@ -189,6 +289,7 @@ const footerText = computed(() => {
           >下一页 ›</button>
         </div>
         <p class="preview-note">结构预览（语义块布局），非 PowerPoint 渲染效果。</p>
+        <p v-if="applyError" class="apply-error" role="alert">应用未成功：{{ applyError }}</p>
       </section>
 
       <aside
@@ -225,37 +326,10 @@ const footerText = computed(() => {
           </template>
         </div>
         <div v-else-if="activeTab === 'evidence'" class="tab-body">
-          <p class="ins-hint">本页依据（服务器定位结果）：</p>
-          <ul class="ev-list">
-            <li v-for="c in currentDeck.claims" :key="c.id">
-              <p class="ev-claim">{{ c.text }}</p>
-              <p v-for="(r, ri) in c.evidence_refs" :key="ri" class="ev-ref">
-                {{ r.document_id }} · 第 {{ r.pdf_page }} 页
-                <button type="button" class="link-btn" disabled title="原文抽屉随 F3 接通">查看原文</button>
-              </p>
-            </li>
-          </ul>
+          <EvidencePanel :slide="selectedSlide" :claims="currentDeck?.claims ?? []" @open-evidence="openEvidence" />
         </div>
         <div v-else class="tab-body">
-          <template v-if="change">
-            <p class="ins-hint">候选核验报告（{{ change.validation.can_commit ? "全部通过" : "存在阻塞" }}）：</p>
-            <ul class="check-list">
-              <li v-for="ck in change.validation.claim_checks" :key="ck.claim_id">
-                <StatusTag
-                  :tone="ck.semantic_status === 'supported' && ck.locator_status === 'located' ? 'ready' : 'failed'"
-                >{{ ck.locator_status === "invalid" ? "定位失败" : ck.semantic_status }}</StatusTag>
-                <span class="check-reason">{{ ck.reason }}</span>
-              </li>
-              <li v-for="(u, ui) in change.validation.unbound_assertions" :key="`u${ui}`">
-                <StatusTag tone="failed">未绑定断言</StatusTag>
-                <span class="check-reason">{{ u.slide_id }} {{ u.field_path }}：{{ u.text }}</span>
-              </li>
-              <li v-for="(w, wi) in change.validation.warnings" :key="`w${wi}`">
-                <StatusTag tone="pending">提示</StatusTag>
-                <span class="check-reason">{{ w }}</span>
-              </li>
-            </ul>
-          </template>
+          <ValidationPanel v-if="change && isCandidate" :change="change" />
           <p v-else class="ins-hint">正式版本没有独立核验报告；核验结论以生成时的候选记录为准。</p>
         </div>
       </aside>
@@ -263,7 +337,7 @@ const footerText = computed(() => {
 
     <template #footer-status>
       <span :class="{ 'error-text': Boolean(loadError) }">{{ footerText }}</span>
-      <span v-if="project && isCandidate" class="ver-line">
+      <span v-if="project && isCandidate && change?.status !== 'committed' && change?.status !== 'stale'" class="ver-line">
         v{{ change?.base_version }} → 候选 v{{ (change?.base_version ?? 0) + 1 }}（未应用）
       </span>
     </template>
@@ -272,13 +346,19 @@ const footerText = computed(() => {
       <AButton disabled title="导出模块（T10）尚未接通，接通后启用">导出 PPTX</AButton>
       <AButton
         type="primary"
-        :disabled="!canApply"
-        :title="canApply ? '教师确认后应用为正式版本' : '候选未通过核验或已过期时不可应用'"
-        @click="() => {}"
+        :disabled="!canApply || applying"
+        :title="canApply ? '教师确认后应用为正式版本' : applyDisabledReason"
+        @click="applyChange"
       >
-        应用此候选版本
+        {{ applying ? "应用中…" : "应用此候选版本" }}
       </AButton>
     </template>
+    <EvidenceDrawer
+      v-model="evidenceOpen"
+      :project-id="props.id"
+      :corpus-revision="evidenceRevision"
+      :span="evidenceSpan"
+    />
   </CourseShell>
 </template>
 
@@ -414,6 +494,34 @@ const footerText = computed(() => {
   color: var(--cc-ink-weak);
   text-align: center;
 }
+.ver-nav {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--cc-font-aux);
+  margin-left: auto;
+}
+.ver-nav button {
+  background: none;
+  border: 1px solid var(--cc-border-strong);
+  border-radius: var(--cc-radius-control);
+  padding: 1px 8px;
+  cursor: pointer;
+  color: var(--cc-ink);
+}
+.ver-nav button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+/* 窄屏"详情"按钮与 ver-nav 同现时，两个 margin-auto 会均分空间：紧邻排布即可。 */
+.ver-nav + .inspector-toggle {
+  margin-left: 8px;
+}
+.apply-error {
+  margin: 6px 0 0;
+  color: var(--cc-blocked);
+  font-size: var(--cc-font-ui);
+}
 .inspector {
   padding: 0;
   display: flex;
@@ -455,41 +563,6 @@ const footerText = computed(() => {
 .ins-hint {
   margin: 0 0 8px;
   font-size: var(--cc-font-aux);
-  color: var(--cc-ink-weak);
-}
-.ev-list,
-.check-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: grid;
-  gap: 10px;
-  font-size: var(--cc-font-aux);
-}
-.ev-claim {
-  margin: 0;
-  font-weight: 500;
-  font-size: var(--cc-font-ui);
-}
-.ev-ref {
-  margin: 2px 0 0;
-  color: var(--cc-ink-weak);
-}
-.link-btn {
-  background: none;
-  border: none;
-  color: var(--cc-primary);
-  cursor: pointer;
-  padding: 0 2px;
-  font-size: inherit;
-}
-.link-btn:disabled {
-  color: var(--cc-ink-weak);
-  cursor: default;
-}
-.check-reason {
-  display: block;
-  margin-top: 2px;
   color: var(--cc-ink-weak);
 }
 .empty-state {
