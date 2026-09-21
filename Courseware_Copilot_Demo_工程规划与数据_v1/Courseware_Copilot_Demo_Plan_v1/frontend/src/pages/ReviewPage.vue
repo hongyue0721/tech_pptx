@@ -12,6 +12,7 @@ import EvidencePanel from "../components/review/EvidencePanel.vue";
 import ValidationPanel from "../components/review/ValidationPanel.vue";
 import StatusTag from "../components/common/StatusTag.vue";
 import CourseShell from "../layouts/CourseShell.vue";
+import { useEscapeClose } from "../composables/useEscapeClose";
 import type {
   CandidateChange,
   CommitRequest,
@@ -30,9 +31,18 @@ const deck = ref<DeckSpec | null>(null);
 const loadError = ref("");
 const activeTab = ref<"content" | "evidence" | "checks">("content");
 const inspectorOpen = ref(false);
-const selectedIndex = ref(0);
 const evidenceOpen = ref(false);
 const evidenceSpan = ref<EvidenceSpan | null>(null);
+let evidenceTrigger: HTMLElement | null = null;
+const inspectorToggleRef = ref<HTMLElement | null>(null);
+
+// 翻页位置承载于 URL ?slide=（FRONTEND_SPEC：query 含 slide），刷新/分享可恢复。
+function slideFromQuery(): number {
+  const s = Number(route.query.slide);
+  return Number.isInteger(s) && s >= 1 ? s - 1 : 0;
+}
+const selectedIndex = ref(slideFromQuery());
+
 let controller: AbortController | null = null;
 let epoch = 0;
 
@@ -133,6 +143,7 @@ function gotoVersion(v: number): void {
 const evidenceRevision = computed(() => currentDeck.value?.corpus_revision ?? null);
 
 function openEvidence(span: EvidenceSpan): void {
+  evidenceTrigger = document.activeElement as HTMLElement | null;
   evidenceSpan.value = span;
   evidenceOpen.value = true;
 }
@@ -165,7 +176,7 @@ async function load(): Promise<void> {
   } catch (err) {
     if (err instanceof DOMException && err.name === "AbortError") return;
     if (myEpoch !== epoch) return;
-    loadError.value = err instanceof ApiError ? err.message : String(err);
+    loadError.value = describeError(err).message;
   }
 }
 
@@ -178,6 +189,27 @@ onBeforeUnmount(() => controller?.abort());
 
 watch(currentDeck, (d) => {
   if (d && selectedIndex.value >= d.slides.length) selectedIndex.value = 0;
+});
+
+// 翻页写回 URL（replace 不入历史栈；slide 不在 load 依赖里，不会触发重读）。
+watch(selectedIndex, (i) => {
+  void router.replace({
+    name: "review",
+    params: { id: props.id },
+    query: { ...route.query, slide: String(i + 1) },
+  });
+});
+
+// Escape 收口：证据抽屉置顶时先关它并回焦触发按钮，否则关 Inspector 抽屉。
+const anyDrawerOpen = computed(() => evidenceOpen.value || inspectorOpen.value);
+useEscapeClose(anyDrawerOpen, () => {
+  if (evidenceOpen.value) {
+    evidenceOpen.value = false;
+    evidenceTrigger?.focus();
+  } else if (inspectorOpen.value) {
+    inspectorOpen.value = false;
+    inspectorToggleRef.value?.focus();
+  }
 });
 
 function goOutline(): void {
@@ -250,6 +282,7 @@ const footerText = computed(() => {
             >›</button>
           </div>
           <button
+            ref="inspectorToggleRef"
             type="button"
             class="narrow-only inspector-toggle"
             @click="inspectorOpen = !inspectorOpen"
@@ -337,8 +370,8 @@ const footerText = computed(() => {
 
     <template #footer-status>
       <span :class="{ 'error-text': Boolean(loadError) }">{{ footerText }}</span>
-      <span v-if="project && isCandidate && change?.status !== 'committed' && change?.status !== 'stale'" class="ver-line">
-        v{{ change?.base_version }} → 候选 v{{ (change?.base_version ?? 0) + 1 }}（未应用）
+      <span v-if="project && isCandidate && change?.status !== 'committed' && change?.status !== 'stale' && change?.status !== 'discarded'" class="ver-line">
+        候选稿未应用 · 基于正式版本 v{{ change?.base_version }}
       </span>
     </template>
     <template #footer-actions>

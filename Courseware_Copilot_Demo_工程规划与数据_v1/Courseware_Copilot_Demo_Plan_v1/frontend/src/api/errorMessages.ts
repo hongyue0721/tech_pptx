@@ -20,6 +20,28 @@ const ERROR_COPY: Record<string, ErrorCopy> = {
     message: "这段依据在当前资料版本里已找不到，请刷新资料后重试。",
     retryable: false,
   },
+  // —— 以下码后端实际可发但 api.md 表未列（全量 Review D-07）：前端先兜底翻译，
+  // api.md 是否补行为契约决策已登记待负责人拍板；不改动事实，只翻译。
+  JOB_NOT_FOUND: { message: "找不到这个任务，请刷新页面核对状态。", retryable: false },
+  EXTRACTION_LIMIT_EXCEEDED: {
+    message: "资料提取内容超出处理上限，请精简文件后重新上传。",
+    retryable: false,
+  },
+  WORKER_ALREADY_RUNNING: {
+    message: "后台处理服务已在运行，本次操作未能执行，请稍后重试。",
+    retryable: true,
+  },
+  ARTIFACT_INTEGRITY: {
+    message: "文件完整性校验不通过，该产物不可用，请重新生成。",
+    retryable: false,
+  },
+  INTERNAL_ERROR: { message: "服务内部错误，操作未完成，请稍后重试。", retryable: true },
+  NOT_FOUND: { message: "请求的内容不存在，请刷新页面核对。", retryable: false },
+  METHOD_NOT_ALLOWED: { message: "该操作不被支持，请通过页面按钮操作。", retryable: false },
+  MALFORMED_SUCCESS: {
+    message: "服务返回了无法解析的响应，操作结果未知，请刷新核对状态。",
+    retryable: false,
+  },
   PAYLOAD_TOO_LARGE: {
     message: "文件数量或大小超出限制（单份 ≤20MiB、最多 5 份），请精简资料。",
     retryable: false,

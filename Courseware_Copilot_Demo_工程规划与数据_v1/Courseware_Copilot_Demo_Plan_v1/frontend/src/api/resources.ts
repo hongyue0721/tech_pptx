@@ -1,4 +1,4 @@
-import { ApiError, request } from "./client";
+import { parseResponse, request } from "./client";
 import type {
   CandidateChange,
   CommitRequest,
@@ -46,11 +46,7 @@ async function fetchForm<T>(path: string, form: FormData, idempotencyKey: string
     },
     body: form,
   });
-  const payload = (await response.json()) as T & { error?: unknown };
-  if (!response.ok) {
-    throw new ApiError(response.status, payload as never);
-  }
-  return payload;
+  return (await parseResponse(response)) as T;
 }
 
 export const plansApi = {

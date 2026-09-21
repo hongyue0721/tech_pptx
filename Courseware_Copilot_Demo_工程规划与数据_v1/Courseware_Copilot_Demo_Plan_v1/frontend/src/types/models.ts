@@ -99,7 +99,7 @@ export interface Material {
   status: "queued" | "parsing" | "ready" | "failed";
   pdf_pages: number | null;
   usable_pages: number | null;
-  corpus_revision: number;
+  corpus_revision: number | null;
   warnings: PageWarning[];
   error_code: string | null;
 }

@@ -21,6 +21,42 @@ function newRequestId(): string {
   return `web_${crypto.randomUUID()}`.slice(0, 128);
 }
 
+// 网关/代理可能返回非 JSON（如 HTML 502）：解析失败不得抛 SyntaxError 穿透
+// 到教师可见文案，按状态码构造兜底错误。request 与 fetchForm 共用（单一来源）。
+export async function parseResponse(response: Response): Promise<unknown> {
+  if (response.status === 204) {
+    return null;
+  }
+  let payload: unknown;
+  try {
+    payload = await response.json();
+  } catch {
+    const requestId = response.headers.get("x-request-id") ?? "";
+    if (!response.ok) {
+      throw new ApiError(response.status, {
+        error: {
+          code: "HTTP_" + response.status,
+          message: `服务返回了无法解析的响应（HTTP ${response.status}）`,
+          request_id: requestId,
+          details: {},
+        },
+      });
+    }
+    throw new ApiError(response.status, {
+      error: {
+        code: "MALFORMED_SUCCESS",
+        message: "服务返回了无法解析的成功响应，操作结果未知，请刷新核对状态",
+        request_id: requestId,
+        details: {},
+      },
+    });
+  }
+  if (!response.ok) {
+    throw new ApiError(response.status, payload as ErrorResponse);
+  }
+  return payload;
+}
+
 export async function request<T>(
   method: string,
   path: string,
@@ -39,14 +75,7 @@ export async function request<T>(
     body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
     signal: options.signal,
   });
-  if (response.status === 204) {
-    return null as T;
-  }
-  const payload: unknown = await response.json();
-  if (!response.ok) {
-    throw new ApiError(response.status, payload as ErrorResponse);
-  }
-  return payload as T;
+  return (await parseResponse(response)) as T;
 }
 
 export const api = {

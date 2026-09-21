@@ -7,6 +7,7 @@ import { api } from "../api/client";
 import { describeError } from "../api/errorMessages";
 import { plansApi } from "../api/resources";
 import StatusTag from "../components/common/StatusTag.vue";
+import { useEscapeClose } from "../composables/useEscapeClose";
 import { useOutlineFlow } from "../composables/useOutlineFlow";
 import CourseShell from "../layouts/CourseShell.vue";
 import type { LessonPlan, PlanSlide, Project } from "../types/models";
@@ -18,12 +19,29 @@ const router = useRouter();
 const project = ref<Project | null>(null);
 const plan = ref<LessonPlan | null>(null);
 const loadError = ref("");
-const selectedIndex = ref(0);
+
+// 翻页位置承载于 URL ?slide=（FRONTEND_SPEC：query 含 slide），刷新可恢复。
+function slideFromQuery(): number {
+  const s = Number(route.query.slide);
+  return Number.isInteger(s) && s >= 1 ? s - 1 : 0;
+}
+const selectedIndex = ref(slideFromQuery());
 let controller: AbortController | null = null;
 let epoch = 0;
 
 const planId = computed(() => (route.query.plan as string | undefined) ?? "");
 const goalsOpen = ref(false);
+let goalsTrigger: HTMLElement | null = null;
+
+function toggleGoals(): void {
+  if (!goalsOpen.value) goalsTrigger = document.activeElement as HTMLElement | null;
+  goalsOpen.value = !goalsOpen.value;
+}
+
+useEscapeClose(goalsOpen, () => {
+  goalsOpen.value = false;
+  goalsTrigger?.focus();
+});
 
 const flow = useOutlineFlow(
   computed(() => props.id),
@@ -66,7 +84,9 @@ async function load(): Promise<void> {
     project.value = p;
     plan.value = pl;
     flow.resetFromPlan(pl);
-    selectedIndex.value = 0;
+    // 保留 URL ?slide= 的翻页位置（刷新可恢复）；越界回落首页。
+    const s = slideFromQuery();
+    selectedIndex.value = s < pl.slides.length ? s : 0;
     flow.restoreJob();
   } catch (err) {
     if (err instanceof DOMException && err.name === "AbortError") return;
@@ -77,6 +97,15 @@ async function load(): Promise<void> {
 }
 
 watch([() => props.id, planId], () => void load(), { immediate: true });
+
+// 翻页写回 URL（replace 不入历史栈；slide 不在 load 依赖里，不触发重读）。
+watch(selectedIndex, (i) => {
+  void router.replace({
+    name: "outline",
+    params: { id: props.id },
+    query: { ...route.query, slide: String(i + 1) },
+  });
+});
 onBeforeUnmount(() => controller?.abort());
 
 function move(index: number, delta: number): void {
@@ -231,7 +260,7 @@ const primaryTitle = computed(() => {
       <span v-else>等待大纲</span>
     </template>
     <template #footer-actions>
-      <AButton class="narrow-only" @click="goalsOpen = !goalsOpen">目标</AButton>
+      <AButton class="narrow-only" @click="toggleGoals">目标</AButton>
       <label v-if="!isConfirmed && !isStale && plan" class="review-check">
         <input v-model="reviewed" type="checkbox" />
         <span>我已逐页审阅大纲</span>

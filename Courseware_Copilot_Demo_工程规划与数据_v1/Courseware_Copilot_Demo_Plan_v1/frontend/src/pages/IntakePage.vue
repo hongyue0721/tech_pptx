@@ -62,7 +62,7 @@ function onPickFiles(event: Event): void {
   const files = Array.from(input.files ?? []);
   input.value = "";
   if (queueFull.value && !isCreateMode.value) {
-    materialsError.value = `最多 ${MAX_MATERIALS} 份资料，请先删除旧资料或新建课题。`;
+    materialsError.value = `最多 ${MAX_MATERIALS} 份资料；当前没有单份删除接口，请新建课题重新组织资料。`;
     return;
   }
   intake.enqueueFiles(files);
@@ -161,6 +161,15 @@ const generateTitle = computed(() => {
   if (!allReady.value) return "资料尚未全部就绪";
   return "";
 });
+
+const createDisabledTitle = computed(() => {
+  if (submitting.value) return "正在创建课题…";
+  if (!topic.value) return "请填写课题";
+  if (!audience.value) return "请填写授课对象";
+  if (goals.value.length === 0) return "至少填写一条教学目标";
+  if (!consent.value) return "需勾选云处理同意后才能创建";
+  return "";
+});
 </script>
 
 <template>
@@ -171,11 +180,11 @@ const generateTitle = computed(() => {
         <form v-if="isCreateMode" class="brief-form" @submit.prevent="createAndUpload">
           <label class="field">
             <span>课题</span>
-            <AInput v-model="topic" placeholder="如：STM32 中断系统" :maxlength="120" />
+            <AInput v-model="topic" placeholder="如：××单元复习与常见误区" :maxlength="120" />
           </label>
           <label class="field">
             <span>授课对象</span>
-            <AInput v-model="audience" placeholder="如：大二电子信息专业" :maxlength="120" />
+            <AInput v-model="audience" placeholder="如：高二××班" :maxlength="120" />
           </label>
           <div class="field-row">
             <label class="field">
@@ -189,7 +198,7 @@ const generateTitle = computed(() => {
           </div>
           <label class="field">
             <span>教学目标（每行一条，最多 8 条）</span>
-            <ATextarea v-model="goalsText" :rows="3" placeholder="理解 NVIC 优先级分组…" />
+            <ATextarea v-model="goalsText" :rows="3" placeholder="如：能解释某概念的两个易混维度…" />
           </label>
           <label class="consent">
             <input id="consent" v-model="consent" type="checkbox" />
@@ -240,6 +249,7 @@ const generateTitle = computed(() => {
             <span class="page-count">{{ m.pdf_pages ?? "—" }} 页 · 可用 {{ m.usable_pages ?? "—" }}</span>
             <StatusTag v-if="m.status === 'ready'" tone="ready">文本就绪</StatusTag>
             <StatusTag v-else-if="m.status === 'failed'" tone="failed">解析失败</StatusTag>
+            <StatusTag v-else-if="m.status === 'queued'" tone="pending">排队中</StatusTag>
             <StatusTag v-else tone="pending">解析中</StatusTag>
             <details v-if="m.warnings.length" class="warnings">
               <summary>{{ m.warnings.length }} 条解析警告</summary>
@@ -262,6 +272,7 @@ const generateTitle = computed(() => {
         <AButton
           type="primary"
           :disabled="submitting || !topic || !audience || goals.length === 0 || !consent"
+          :title="createDisabledTitle"
           @click="createAndUpload"
         >
           {{ submitting ? "创建中…" : "保存设置并解析资料 →" }}
