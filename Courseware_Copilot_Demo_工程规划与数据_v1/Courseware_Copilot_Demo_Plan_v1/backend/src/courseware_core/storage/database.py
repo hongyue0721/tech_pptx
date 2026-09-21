@@ -197,7 +197,18 @@ CREATE INDEX IF NOT EXISTS idx_changes_project ON changes(project_id, created_at
 
 
 def connect(db_path: Path) -> sqlite3.Connection:
-    conn = sqlite3.connect(db_path)
+    # check_same_thread=False：uvicorn 把同步路由/依赖派发进线程池，而依赖
+    # teardown 经 AsyncExitStack 在事件循环线程 close——连接创建/使用/关闭
+    # 天然跨线程（2026-09-21 并发 GET 500 生产实锤）。安全性完全押在底层
+    # SERIALIZED 模式上，故 threadsafety!=3 的环境直接拒绝启动（F4 Review B1：
+    # 口头前提必须可执行），并发写仍由每请求独立连接+文件锁+CAS 保证。
+    if sqlite3.threadsafety != 3:
+        raise RuntimeError(
+            "sqlite3 底层非 SERIALIZED 模式（threadsafety="
+            f"{sqlite3.threadsafety}），禁止跨线程交接连接；"
+            "请更换 Python/SQLite 构建或停用线程池同步路由"
+        )
+    conn = sqlite3.connect(db_path, check_same_thread=False)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA journal_mode=WAL")
     conn.execute("PRAGMA foreign_keys=ON")
