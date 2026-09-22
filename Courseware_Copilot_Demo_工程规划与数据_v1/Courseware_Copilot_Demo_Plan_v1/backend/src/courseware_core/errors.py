@@ -198,3 +198,12 @@ class EditUnsupported(DomainError):
     def __init__(self, message: str = "edit instruction or targets unsupported",
                  details: Optional[dict] = None):
         super().__init__("EDIT_UNSUPPORTED", message, details)
+
+
+class DeckExportError(DomainError):
+    """导出结构性防线：committed deck 出现无法忠实渲染的形态（claim 引用不可
+    解析、claim id 重复、L1 自检不过）时显式失败，绝不静默丢内容或任选一条。
+    复用 api.md 既有码 EXPORT_FAILED（job.failed，保留 DeckVersion 只重试派生步骤）。"""
+
+    def __init__(self, message: str, details: Optional[dict] = None):
+        super().__init__("EXPORT_FAILED", message, details)
