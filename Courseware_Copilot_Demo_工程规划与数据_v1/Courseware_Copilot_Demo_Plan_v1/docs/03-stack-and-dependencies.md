@@ -12,8 +12,8 @@
 | PDF | pypdf | 原PyMuPDF调整原因：[S13—S15]；不启用OCR |
 | 检索 | jieba + rank-bm25 | 锁版本、词典和tokenizer_version；无embedding |
 | 存储 | SQLite（WAL、外键、busy timeout）+ 文件 | 单实例，原子写与快照 |
-| 渲染 | PptExportAdapter → 通过准入的ppt-edit | 版本/提交/二进制hash/许可全部记录 |
-| 替代出口 | PptxGenJS，仅当准入失败时切换 | 单一激活出口；不是两套都做 |
+| 渲染 | python-pptx==1.0.2（ADR-11，2026-09-21 负责人拍板，唯一激活出口） | uv.lock 锁定；MIT；生成 T02 实测过的同类 OOXML 完整部件链 |
+| 替代出口 | ppt-edit/PptxGenJS 均不激活（ADR-11） | 单一激活出口；不是两套都做；回退须修订 ADR |
 | 测试 | pytest、jsonschema、前端类型检查、Playwright | live标签默认不消耗API；需显式开启 |
 | 部署 | 单台云实例 + Nginx HTTPS + systemd | 不是强制华为ECS，选择其可便于展示；见[S01]云部署目标 |
 

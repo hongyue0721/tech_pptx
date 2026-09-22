@@ -4,10 +4,11 @@
 
 | 项目 | 已知信息 | 处理状态 |
 |---|---|---|
-| AnyUI | 仓库package声明MIT、版本0.5.2，Vue入口 | 候选；发布/安装/构建待实测，保留许可 |
-| ppt-edit-skill | package1.3.0、作者binaryify；LICENSE版权Binaryify Zhuang、MIT | 候选；用户贡献边界待厘清，不冒充原创 |
-| neo-ppt镜像/本地patched WASM | local-export README明确提到patched与no-sign | 授权/来源逐项待核验；不因root MIT自动放行，不在本包重分发 |
-| PptxGenJS | 官方导出工具候选 | ppt-edit未过门禁时备选；实际license/version再核验 |
+| AnyUI | 仓库package声明MIT、版本0.5.2，Vue入口 | **已引入运行路径**（npm --save-exact 0.5.2，仅 Vue 运行时 peers；图标不远程加载=纯具名导入）；保留许可 |
+| ppt-edit-skill | package1.3.0、作者binaryify；LICENSE版权Binaryify Zhuang、MIT | 不进运行路径（ADR-11，2026-09-21：R05 授权核验未闭合，T10 切 python-pptx）；不冒充原创 |
+| neo-ppt镜像/本地patched WASM | local-export README明确提到patched与no-sign | 不进运行路径（同上）；不因root MIT自动放行，不在本包重分发 |
+| PptxGenJS | 官方导出工具候选 | 不激活（ADR-11：避免 Node 侧导出链；回退须修订 ADR） |
+| python-pptx | MIT，包内 LICENSE 文件已读，版本 1.0.2（PyPI 官方 wheel）；传递依赖 lxml 6.1.3 / pillow 12.3.0 / xlsxwriter 3.2.9（许可随包 dist-info 核对） | **已引入运行路径**（ADR-11 T10 渲染唯一激活出口）；uv.lock 锁定、保留许可声明 |
 | pypdf | BSD-3-Clause许可证文件已读 | 默认解析候选；锁实际版本、保留NOTICE |
 | PyMuPDF | 官方列AGPL和商业许可选择 | 不作为默认业务依赖，改用需批准许可策略 |
 | Vue/Vite/FastAPI/Pydantic/jieba/rank-bm25 | 技术候选 | M0锁版本并核对实际分发许可，不凭记忆汇总 |
