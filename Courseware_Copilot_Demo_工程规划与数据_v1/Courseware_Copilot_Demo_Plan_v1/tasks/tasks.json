@@ -473,7 +473,7 @@
     "id": "T13",
     "stage": "M3",
     "title": "原创Skill共享core落地",
-    "status": "PLANNED",
+    "status": "PARTIAL",
     "depends_on": [
       "T09",
       "T10",
@@ -498,7 +498,13 @@
     ],
     "constraints": "模板转实际Skill，不伪造已完成",
     "owner": "鸿岳（单人主开发）",
-    "evidence": []
+    "evidence": [
+      "目标CLI真实实现：courseware_core/cli/（python -m courseware_core.cli，12 命令=workflow.md 目标契约全实现+deck show）；信封恒单 JSON、退出码 0/1/2/3/4、错误码复用 api.md（USAGE_ERROR 仅 CLI 用法层）；真实 subprocess 入口测试锁",
+      "独立data-dir锁：CLI 非 job 命令 DataDirLock 与 JobWorker 同一把 flock（worker_lock_path 单一事实源）；误指 Web 数据目录立即 WORKER_ALREADY_RUNNING rc3（同进程第二 fd 实证）；job 命令临时启动同一 JobWorker（锁/恢复/GC/CAS/发布复核全复用，零平行执行器）；装配下沉 worker_handlers.py（core 不反依赖 api，wiring 薄 re-export 保 import 面）",
+      "码道Skill黄金链实际运行（docs/t13-skill-golden-chain.md）：真实进程 CLI+独立 data-dir，deepseek 真实 8 次调用（plan 1+generate 7，jobs.llm_calls 程序化核对）；真实模型候选被核验门正确 blocked（quote 非子串+missing_evidence，不盖绿）；seed v1（声明构造）→reorder llm_calls=0→commit→restore→export 44 部件 4 页可编辑中文+sha256 一致；待验=码道新会话自动发现/CLI 会话加载（会话快照限制+AK/SK 不落盘红线，如实登记不谎报）",
+      "公开目录不带大依赖：skill 目录纯 md（SKILL.md 去模板态+references 实际契约版）；安装=仓库锁定 venv+PYTHONPATH，零新增依赖",
+      "测试 661→684（净增 23）exit 0、validate 23/23、typecheck/build 0；独立 Review（Qwen3.8-Flash 标注）B1+6 非阻塞全当场闭环，轻量复审放行"
+    ]
   },
   {
     "id": "T14",
