@@ -1,6 +1,6 @@
 # api｜HTTP接口契约 v1.0.0
 
-规范文件：`contracts/openapi.json`；数据类型：`contracts/models.schema.json`。本文件说明业务语义；三者和代码必须同次变更。路由实现状态以 `process.md` 当前记录为准：T04–T09 与 F00 只读接口（deck/evidence）已挂载；T12 edits/restores 已挂载；previews/exports/artifacts 仍为目标契约，未挂载前不对外提供。
+规范文件：`contracts/openapi.json`；数据类型：`contracts/models.schema.json`。本文件说明业务语义；三者和代码必须同次变更。路由实现状态以 `process.md` 当前记录为准：T04–T09 与 F00 只读接口（deck/evidence）已挂载；T12 edits/restores 已挂载；T10 exports/previews/artifacts download 已挂载（python-pptx 导出，ADR-11）。
 
 ## 通用约定
 
@@ -64,9 +64,11 @@ split_slide要给完整替换页内容，不是只写一个"split"操作名就�
 
 RestoreRequest：target_version、base_version、corpus_revision、acknowledged=true。返回新DeckVersion。P0仅允许同当前corpus_revision的恢复；旧语料版本返回409 CORPUS_CHANGED，需重新规划生成。不能恢复陈旧报告作为当前正确性证据。
 
-ExportRequest：version、format="pptx"。正式版本未通过门禁或语料过期返回409/422，不偷偷降级到整页图片PPT。导出job终态返回artifact_id；下载有明确版本、文件hash和文件名；PPTX使用attachment，预览图可使用对应image/png或image/jpeg和受控inline，不能将任意上传内容按HTML执行。
+ExportRequest：version、format="pptx"。正式版本未通过门禁或语料过期返回409/422（该门针对"以未应用候选为导出源"的误用；export 以已提交版本为快照源，语料前进不影响历史版本导出，见下段），不偷偷降级到整页图片PPT。导出job终态返回artifact_id；下载有明确版本、文件hash和文件名；PPTX使用attachment，预览图可使用对应image/png或image/jpeg和受控inline，不能将任意上传内容按HTML执行。
 
-PreviewManifest标 `source_type=pptd_render|pptx_render|outline`。outline只是结构预览，UI必须写明，不声称与PowerPoint相同。PPTD截图成功也不证明导出PPTX排版正确。
+导出实现语义（T10，python-pptx，ADR-11）：export 是只读快照 job——受理不占项目写锁（有活动写任务时仍可排队导出，claim_next 按 kind='export' 放行），渲染输入固定为 deck_versions 中该 version 的 committed 内容（版本前进不影响在途导出），零模型调用零外发故不受 consent 门。job 成功时成对落两个 artifact：`result_ref` 指向 pptx，evidence-report.json（claim→资料短代号+页码+完整 quote）按 `art_{job后缀}_report` 同规则可下载；下载响应带 Content-Disposition attachment、X-Artifact-Sha256 校验和，跨项目 artifact 按 404 处理不泄露存在性。导出器交付前做 L1 结构自检（部件链完整+页数一致），自检不过 job=failed/EXPORT_FAILED，绝不产出残缺文件；L1 通过不冒充 L3 目标 Office 人工验收。损坏的 committed 版本（fact 引用不可解析、claim id 重复）被结构性拒绝导出（EXPORT_FAILED），保留原版本不修复。
+
+PreviewManifest标 `source_type=pptd_render|pptx_render|outline`。outline只是结构预览，UI必须写明，不声称与PowerPoint相同。PPTD截图成功也不证明导出PPTX排版正确。P0 实现=outline 级：GET previews 按精确 version 返回每页 ready（artifact_id 恒空，服务端不产渲染图）；存储内容不可解析的版本诚实返回单条 failed item 带 warning，绝不盖绿。
 
 ## 错误码与HTTP语义
 

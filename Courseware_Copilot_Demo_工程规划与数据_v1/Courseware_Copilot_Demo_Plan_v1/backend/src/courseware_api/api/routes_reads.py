@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, Query
 
 from courseware_api.dependencies import get_read_service
 from courseware_core.models import DeckSpec, DocumentChunk
+from courseware_core.models.export import PreviewManifest
 from courseware_core.services.read_service import ProjectReadService
 
 router = APIRouter()
@@ -18,6 +19,18 @@ def get_deck(
     service: ProjectReadService = Depends(get_read_service),
 ) -> DeckSpec:
     return service.get_deck(project_id, version)
+
+
+@router.get(
+    "/projects/{project_id}/versions/{version}/previews",
+    response_model=PreviewManifest,
+)
+def get_previews(
+    project_id: str,
+    version: int,
+    service: ProjectReadService = Depends(get_read_service),
+) -> PreviewManifest:
+    return service.get_previews(project_id, version)
 
 
 @router.get("/projects/{project_id}/evidence/{chunk_id}", response_model=DocumentChunk)

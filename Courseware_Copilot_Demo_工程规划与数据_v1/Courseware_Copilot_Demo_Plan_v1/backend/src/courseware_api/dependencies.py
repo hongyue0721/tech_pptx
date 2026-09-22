@@ -5,6 +5,7 @@ from fastapi import Depends, Request
 
 from courseware_core.services.generate_service import GenerateService
 from courseware_core.services.edit_service import EditService
+from courseware_core.services.export_service import ExportService
 from courseware_core.services.idempotency_service import IdempotencyService
 from courseware_core.services.job_service import JobService
 from courseware_core.services.material_service import MaterialService
@@ -13,6 +14,7 @@ from courseware_core.services.project_service import ProjectService
 from courseware_core.services.read_service import ProjectReadService
 from courseware_core.services.restore_service import RestoreService
 from courseware_core.storage.database import connect
+from courseware_core.storage.artifact_store import ArtifactStore
 from courseware_core.storage.idempotency_repository import IdempotencyRepository
 from courseware_core.storage.job_repository import JobRepository
 from courseware_core.storage.project_repository import ProjectRepository
@@ -80,3 +82,17 @@ def get_edit_service(
 ) -> EditService:
     # 受理期不调模型；provider 在 worker handler 注入（wiring），与 plan/generate 同口径。
     return EditService(conn)
+
+
+def get_export_service(
+    request: Request,
+    conn: sqlite3.Connection = Depends(get_conn),
+) -> ExportService:
+    return ExportService(conn, artifacts_root=request.app.state.artifacts_root)
+
+
+def get_artifact_store(
+    request: Request,
+    conn: sqlite3.Connection = Depends(get_conn),
+) -> ArtifactStore:
+    return ArtifactStore(conn, request.app.state.artifacts_root)

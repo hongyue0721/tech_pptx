@@ -10,7 +10,16 @@ import courseware_api.dev as dev
 def test_build_dev_app_wires_all_handlers_and_worker(tmp_path):
     app = dev.build_dev_app(db_path=tmp_path / "dev.db")
     assert app.state.worker is not None
-    assert set(app.state.worker._handlers) == {"parse", "plan", "generate", "edit"}
+    assert set(app.state.worker._handlers) == {
+        "parse",
+        "plan",
+        "generate",
+        "edit",
+        "export",
+    }
+    # 导出产物目录随装配点就位（T10）：handler 与 HTTP 层必须同一 root。
+    assert app.state.artifacts_root == tmp_path / "artifacts"
+    assert app.state.artifacts_root.is_dir()
     app.state.worker._release_singleton_lock()
 
 

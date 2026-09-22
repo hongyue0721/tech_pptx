@@ -11,6 +11,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 
 from courseware_api.api.routes_changes import router as changes_router
 from courseware_api.api.routes_edits import router as edits_router
+from courseware_api.api.routes_exports import router as exports_router
 from courseware_api.api.routes_health import router as health_router
 from courseware_api.api.routes_jobs import router as jobs_router
 from courseware_api.api.routes_materials import router as materials_router
@@ -63,6 +64,7 @@ def create_app(
     worker_handlers: Optional[dict[str, JobHandler]] = None,
     materials_root: Optional[Path] = None,
     materials_limits: Optional[ProjectLimits] = None,
+    artifacts_root: Optional[Path] = None,
 ) -> FastAPI:
     """worker_handlers 不为 None 时按 docs/07 §1 在 app 启动期创建单后台工作器；
     P0 测试与骨架运行默认不启用（None），业务 handler 按需注入（T05 提供 parse）。"""
@@ -72,6 +74,8 @@ def create_app(
     conn.close()
 
     materials_dir = resolve_materials_root(db_path, materials_root)
+    artifacts_dir = Path(artifacts_root) if artifacts_root is not None else db_path.parent / "artifacts"
+    artifacts_dir.mkdir(parents=True, exist_ok=True)
     # R00-B：GC 不在 create_app 执行——第二实例在取得数据目录独占锁之前
     # 不得触碰共享目录（活动上传窗口文件会被误删）。GC 归 worker 锁后路径。
     worker = (
@@ -95,6 +99,7 @@ def create_app(
     )
     app.state.db_path = db_path
     app.state.materials_root = materials_dir
+    app.state.artifacts_root = artifacts_dir
     app.state.material_limits = materials_limits or ProjectLimits()
     app.state.worker = worker
     app.add_middleware(RequestIDMiddleware)
@@ -108,4 +113,5 @@ def create_app(
     app.include_router(reads_router, prefix=API_PREFIX)
     app.include_router(restores_router, prefix=API_PREFIX)
     app.include_router(edits_router, prefix=API_PREFIX)
+    app.include_router(exports_router, prefix=API_PREFIX)
     return app

@@ -49,6 +49,9 @@ DOMAIN_ERROR_STATUS = {
     "MODEL_TIMEOUT": 503,
     "MODEL_UNAVAILABLE": 503,
     "ARTIFACT_INTEGRITY": 500,
+    # 受理期 deck 内容损坏=服务端数据完整性失败（与 ARTIFACT_INTEGRITY 同族），
+    # 显式登记不依赖 get(code,500) 隐式兜底（T10 复审 N4）；执行期同码走 job.failed。
+    "EXPORT_FAILED": 500,
 }
 
 # Starlette层HTTPException（未注册路由404、方法405等）也必须输出统一错误形状（api.md通用约定）。

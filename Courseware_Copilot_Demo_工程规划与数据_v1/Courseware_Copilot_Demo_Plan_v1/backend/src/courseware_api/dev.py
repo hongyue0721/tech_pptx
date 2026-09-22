@@ -1,4 +1,4 @@
-"""开发启动入口：装配 parse/plan/generate handlers + 唯一 worker，仅绑回环。
+"""开发启动入口：装配 parse/plan/generate/edit/export handlers + 唯一 worker，仅绑回环。
 
 create_app(worker_handlers=None) 是测试工厂——直接当业务服务跑会"受理 job
 但永远无人执行"（假可用）。本模块是开发/演示的真实装配点：
@@ -25,8 +25,13 @@ def build_dev_app(db_path: Optional[Path] = None) -> FastAPI:
     materials = Path(
         os.environ.get("APP_MATERIALS_DIR", str(db.parent / "materials"))
     )
-    handlers = build_worker_handlers(db, materials)
-    return create_app(db, worker_handlers=handlers, materials_root=materials)
+    artifacts = Path(
+        os.environ.get("APP_ARTIFACTS_DIR", str(db.parent / "artifacts"))
+    )
+    handlers = build_worker_handlers(db, materials, artifacts_root=artifacts)
+    return create_app(
+        db, worker_handlers=handlers, materials_root=materials, artifacts_root=artifacts
+    )
 
 
 def serve(db_path: Optional[Path] = None) -> None:

@@ -15,6 +15,7 @@ from courseware_core.errors import (
     ProjectNotFound,
 )
 from courseware_core.models import DeckSpec, DocumentChunk, Project
+from courseware_core.models.export import PreviewItem, PreviewManifest
 from courseware_core.storage.project_repository import ProjectRepository
 
 
@@ -40,6 +41,52 @@ class ProjectReadService:
         if row is None:
             raise DeckNotFound({"project_id": project_id, "version": target})
         return DeckSpec.model_validate_json(row["deck_json"])
+
+    def get_previews(self, project_id: str, version: int) -> PreviewManifest:
+        """T10 预览 manifest：P0=OUTLINE 级结构预览（docs/08 §预览分级）——
+        声明每页来源与状态，不冒充渲染图；损坏版本诚实 failed，绝不盖绿。"""
+        project = self._projects.get(project_id)
+        if project is None:
+            raise ProjectNotFound({"project_id": project_id})
+        if version < 1:
+            raise DeckNotFound({"project_id": project_id, "version": version})
+        row = self._conn.execute(
+            "SELECT deck_json FROM deck_versions"
+            " WHERE project_id = ? AND version = ?",
+            (project_id, version),
+        ).fetchone()
+        if row is None:
+            raise DeckNotFound({"project_id": project_id, "version": version})
+        try:
+            deck = DeckSpec.model_validate_json(row["deck_json"])
+        except Exception:
+            return PreviewManifest(
+                project_id=project_id,
+                version=version,
+                items=[
+                    PreviewItem(
+                        slide_id="deck",
+                        status="failed",
+                        source_type="outline",
+                        artifact_id=None,
+                        warning="stored deck could not be parsed; structural preview unavailable for this version",
+                    )
+                ],
+            )
+        return PreviewManifest(
+            project_id=project_id,
+            version=version,
+            items=[
+                PreviewItem(
+                    slide_id=s.id,
+                    status="ready",
+                    source_type="outline",
+                    artifact_id=None,
+                    warning=None,
+                )
+                for s in deck.slides
+            ],
+        )
 
     def get_evidence(
         self, project_id: str, chunk_id: str, corpus_revision: int

@@ -8,6 +8,7 @@ from courseware_core.jobs.worker import JobHandler
 from courseware_core.llm.adapter import ChatCompletionsAdapter
 from courseware_core.llm.config import LLMConfig
 from courseware_core.models import Job, JobResultRef
+from courseware_core.services.export_service import ExportService
 from courseware_core.services.generate_service import GenerateService
 from courseware_core.services.edit_service import EditService
 from courseware_core.services.material_service import MaterialService
@@ -19,6 +20,7 @@ def build_worker_handlers(
     db_path: Path,
     materials_root: Path,
     plan_provider: Optional[object] = None,
+    artifacts_root: Optional[Path] = None,
 ) -> dict[str, JobHandler]:
     """worker_handlers 注入 create_app；每个 handler 每次执行开短事务/独立连接。
 
@@ -82,11 +84,22 @@ def build_worker_handlers(
         finally:
             conn.close()
 
+    def export_handler(job: Job) -> JobResultRef:
+        conn = connect(db_path)
+        try:
+            # 纯渲染零模型零外发：不经 provider，无凭据环境也必须可执行。
+            root = artifacts_root if artifacts_root is not None else db_path.parent / "artifacts"
+            service = ExportService(conn, artifacts_root=root)
+            return JobResultRef(type="artifact", id=service.handle_export(job.id))
+        finally:
+            conn.close()
+
     return {
         "parse": parse_handler,
         "plan": plan_handler,
         "generate": generate_handler,
         "edit": edit_handler,
+        "export": export_handler,
     }
 
 
