@@ -40,6 +40,13 @@ PPTX_MIME = "application/vnd.openxmlformats-officedocument.presentationml.presen
 EXPORT_DEADLINE_SECONDS = 120
 
 
+def artifact_filename(record) -> str:
+    """交付文件名派生（单一事实源）：Web download 与 CLI 导出复制同规则。"""
+    if record.mime == PPTX_MIME:
+        return f"courseware-v{record.version}.pptx"
+    return f"evidence-report-v{record.version}.json"
+
+
 class ExportService:
     def __init__(self, conn, artifacts_root: Path):
         self._conn = conn

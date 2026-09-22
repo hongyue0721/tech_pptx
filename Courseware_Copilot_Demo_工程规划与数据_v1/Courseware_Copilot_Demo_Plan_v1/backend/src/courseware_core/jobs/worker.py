@@ -20,6 +20,15 @@ from courseware_core.storage.job_repository import JobRepository
 JobHandler = Callable[[Job], Optional[JobResultRef]]
 
 
+def worker_lock_path(db_path: Path) -> Path:
+    """数据目录独占锁路径（单一事实源）：JobWorker 与 T13 CLI 共用同一把锁。
+
+    谁持有该 flock，谁就是该 SQLite 的唯一写入执行者——CLI 误指向运行中
+    Web 服务的 data-dir 时直接 WORKER_ALREADY_RUNNING，而非绕过服务边界。
+    """
+    return Path(str(db_path) + ".worker.lock")
+
+
 def _error_response(
     code: str, message: str, details: Optional[dict] = None
 ) -> ErrorResponse:
@@ -57,7 +66,7 @@ class JobWorker:
         self._handlers = dict(handlers)
         self._poll_interval = poll_interval
         self._worker_id = worker_id or f"worker_{secrets.token_hex(6)}"
-        self._lock_path = lock_path or Path(str(self._db_path) + ".worker.lock")
+        self._lock_path = lock_path or worker_lock_path(self._db_path)
         self._materials_root = Path(materials_root) if materials_root else None
         self._stop_event = threading.Event()
         self._thread: Optional[threading.Thread] = None

@@ -12,9 +12,9 @@ from courseware_api.idempotency import execute_idempotent
 from courseware_core.errors import ArtifactNotFound
 from courseware_core.models import JobAccepted
 from courseware_core.models.export import ExportRequest
-from courseware_core.services.export_service import PPTX_MIME, ExportService
+from courseware_core.services.export_service import ExportService, artifact_filename
 from courseware_core.services.idempotency_service import IdempotencyService
-from courseware_core.storage.artifact_store import ArtifactRecord, ArtifactStore
+from courseware_core.storage.artifact_store import ArtifactStore
 
 router = APIRouter()
 
@@ -43,12 +43,6 @@ def create_export(
     )
 
 
-def _download_filename(record: ArtifactRecord) -> str:
-    if record.mime == PPTX_MIME:
-        return f"courseware-v{record.version}.pptx"
-    return f"evidence-report-v{record.version}.json"
-
-
 @router.get("/projects/{project_id}/artifacts/{artifact_id}/download")
 def download_artifact(
     request: Request,
@@ -65,7 +59,7 @@ def download_artifact(
         content=data,
         media_type=record.mime,
         headers={
-            "Content-Disposition": f'attachment; filename="{_download_filename(record)}"',
+            "Content-Disposition": f'attachment; filename="{artifact_filename(record)}"',
             "X-Artifact-Sha256": record.sha256,
         },
     )
