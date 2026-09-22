@@ -6,6 +6,7 @@ import type {
   DeckVersion,
   DocumentChunk,
   EditRequest,
+  ExportRequest,
   GenerateRequest,
   Job,
   JobAccepted,
@@ -133,4 +134,16 @@ export const restoresApi = {
       body,
       idempotencyKey,
     }),
+};
+
+export const exportsApi = {
+  create: (projectId: string, body: ExportRequest, idempotencyKey: string) =>
+    request<JobAccepted>("POST", `/projects/${enc(projectId)}/exports`, {
+      body,
+      idempotencyKey,
+    }),
+  // 下载走浏览器原生导航（Content-Disposition attachment），不经 fetch：
+  // 二进制落盘由浏览器完成，服务端校验和头 X-Artifact-Sha256 随响应交付。
+  downloadUrl: (projectId: string, artifactId: string) =>
+    `/api/v1/projects/${enc(projectId)}/artifacts/${enc(artifactId)}/download`,
 };

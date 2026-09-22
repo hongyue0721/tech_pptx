@@ -10,6 +10,7 @@ import { changesApi, deckApi } from "../api/resources";
 import EditPanel from "../components/review/EditPanel.vue";
 import EvidenceDrawer from "../components/review/EvidenceDrawer.vue";
 import EvidencePanel from "../components/review/EvidencePanel.vue";
+import ExportPanel from "../components/review/ExportPanel.vue";
 import SlideMoveControls from "../components/review/SlideMoveControls.vue";
 import ValidationPanel from "../components/review/ValidationPanel.vue";
 import VersionHistoryPanel from "../components/review/VersionHistoryPanel.vue";
@@ -90,6 +91,8 @@ const currentDeck = computed<DeckSpec | null>(() =>
   version.value !== null ? deck.value : change.value?.candidate ?? null,
 );
 const isCandidate = computed(() => version.value === null && change.value !== null);
+// T10：导出 job 精确 ID 承载于 ?export_job=（刷新恢复下载链接；终态消耗归组件）。
+const exportJobId = computed(() => (route.query.export_job as string | undefined) ?? null);
 const selectedSlide = computed(
   () => currentDeck.value?.slides[selectedIndex.value] ?? null,
 );
@@ -442,7 +445,14 @@ const footerText = computed(() => {
     </template>
     <template #footer-actions>
       <AButton :disabled="!project" @click="goOutline">返回大纲</AButton>
-      <AButton disabled title="导出模块（T10）尚未接通，接通后启用">导出 PPTX</AButton>
+      <ExportPanel
+        v-if="project && !isCandidate"
+        :project-id="props.id"
+        :version="version ?? project.current_version"
+        :initial-job-id="exportJobId"
+        @update:job-id="(v: string | null) => gotoQuery({ export_job: v })"
+      />
+      <AButton v-else disabled title="候选稿须先应用为正式版本，再导出该版本">导出 PPTX</AButton>
       <AButton
         type="primary"
         :disabled="!canApply || applying"

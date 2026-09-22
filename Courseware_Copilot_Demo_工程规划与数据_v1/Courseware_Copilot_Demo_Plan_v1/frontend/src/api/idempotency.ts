@@ -87,6 +87,12 @@ export function cancelJobKey(jobId: string): string {
   return stableKey("cancel", jobId);
 }
 
+export function exportKey(projectId: string, version: number): string {
+  // 导出是只读快照 job：键=版本意图；终态后同键=幂等重放原 job（不双渲染），
+  // 失败占位回滚后同键重试=重新执行（与 editKey 同一语义，无 attempt 维度）。
+  return stableKey("export", projectId, version);
+}
+
 // 幂等重放要求同载荷同键：对确认载荷做键序稳定的规范化序列化。
 export function canonicalize(value: unknown): string {
   if (value === null || typeof value !== "object") {

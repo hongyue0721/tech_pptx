@@ -295,3 +295,8 @@ export interface RestoreRequest {
   corpus_revision: number;
   acknowledged: true;
 }
+
+export interface ExportRequest {
+  version: number;
+  format: "pptx";
+}
