@@ -365,7 +365,7 @@
     "id": "T10",
     "stage": "M2",
     "title": "固定模板渲染和版本导出",
-    "status": "PLANNED",
+    "status": "PARTIAL",
     "depends_on": [
       "T09",
       "T02"
@@ -388,7 +388,13 @@
     ],
     "constraints": "仅一个active Exporter",
     "owner": "鸿岳（单人主开发）",
-    "evidence": []
+    "evidence": [
+      "ADR-11 选型闭环（2026-09-21/22 负责人两轮拍板+纠偏）：python-pptx==1.0.2 唯一激活出口（MIT 许可逐包核对入 THIRD_PARTY；R05 ppt-edit 不进运行路径、PptxGenJS 不激活；docs/03/08/16 同步）",
+      "exporter 核心（工作区段）：四布局固定坐标/16:9/32-24-12/classroom_v1/页脚 M 代号·p 页码/a:ea 中文 face/文档属性时间戳固定/转义防注入/L1 自检不过不交付；结构防线 重复 claim id+ghost fact→EXPORT_FAILED（复用 api.md 既有码）；14 条单测含 16 页×6 块边界与三导出语义一致（docs/08 L4）",
+      "export 只读快照 job+POST /exports+download+previews（工作区段）：不占写锁与 claim_next 放行同口径、版本固定、deadline 120s；产物成对 pptx+evidence-report.json（art_{job}_report 派生规则契约测试锁死）；download attachment+X-Artifact-Sha256+跨项目 404；PreviewManifest P0=outline 诚实承载、损坏版本 failed 不盖绿；661 collected exit 0、validate 23/23",
+      "前端 ExportPanel+浏览器链 PASS（无凭据后端，零真实模型调用）：?export_job= 刷新恢复、failed 清 URL 同键重试、候选视图 disabled+原因；真实下载文件重开验证 44 部件/4 页中文；截图 docs/screenshots/t10/ 2 张；独立 Review+轻量复审（模型 huaweicloud/qwen3.8-flash 标注）：B1/B2 取证证伪误报、N1/N3/N4/Q2 全红→绿闭环",
+      "L3 目标 Office 实测 BLOCKED 待负责人：验收文件 .cc_demo/t10_l3/courseware-v5.pptx（打开+改文本+保存重开）；L3 未跑故 T10 判 PARTIAL 不冒 DONE"
+    ]
   },
   {
     "id": "T11",
