@@ -461,14 +461,18 @@ class TestHandleGenerate:
         assert len(change.candidate.slides) == 4
         assert change.status == "ready"
 
-    def test_duplicate_claim_ids_across_batches_block(self, conn):
+    def test_duplicate_claim_ids_across_batches_renamed_unique(self, conn):
+        # T14 真实链实锤（第 3 次真实 generate）：模型每批只见本批、claim id
+        # 各自从 c1 编号——跨批碰撞是必然，旧期望"blocked"对真实模型不可满足。
+        # 服务器在合并边界改名保全局唯一；verify 模型始终只见批内局部 id
+        # （第 4 次真实 generate 实锤：模型不肯逐字复制 c1-b3 长 id，改名前置
+        # 会致整批 unknown/not_checked——回归防线）。
         slides = plan_slides(4)
         seed_confirmed_plan(conn, slides=slides)
         job = make_generate_job(conn, "job_g11")
         provider = ScriptedProvider(
             {
                 "generate_content": [
-                    # 批1三页含 clmX；批2复用同名 clmX——跨批 id 冲突。
                     multi_proposal([("ps1", "clmX"), ("ps2", "clm2"), ("ps3", "clm3")]),
                     multi_proposal([("ps4", "clmX")]),
                 ],
@@ -479,8 +483,19 @@ class TestHandleGenerate:
         service = GenerateService(conn, provider=provider)
         ref = service.handle_generate(job)
         change = ChangeRepository(conn).get(ref.id)
-        assert change.validation.relations_valid is False
-        assert change.status == "blocked"
+        ids = [c.id for c in change.candidate.claims]
+        assert len(ids) == len(set(ids)) == 4
+        assert "clmX-b2" in ids
+        assert change.validation.relations_valid is True
+        assert change.status == "ready" and change.validation.can_commit is True
+        refs = {
+            b.claim_id
+            for s in change.candidate.slides
+            for b in s.blocks
+            if b.type == "fact"
+        }
+        assert refs == set(ids)
+        assert {c.claim_id for c in change.validation.claim_checks} == set(ids)
 
     def test_fact_referencing_unknown_claim_blocks(self, conn):
         seed_confirmed_plan(conn)
@@ -1260,13 +1275,13 @@ class TestCandidateWriteGuard:
 
 
 class TestStructuralRecheck:
-    def test_cross_batch_duplicate_claim_ids_blocked(self, conn):
-        # 回归锁（2026-09-21 T12 浏览器轮实锤教训）：模型跨批复用临时 claim
-        # ID（c1×2 不同内容）时，relations 门与 full_coverage 门必须拦成
-        # blocked——demo 库中 committed v1 带重复 ID 即构造候选绕过本门的
-        # 历史产物，本测试锁死真实生成路径不可复现。
+    def test_cross_batch_duplicate_claim_ids_renamed_not_masked(self, conn):
+        # T12 教训（同 ID 异内容互相掩盖）+ T14 修复（服务器改名保全局唯一）：
+        # 模型跨批复用临时 ID（c1×2 不同内容）时，改名后两条内容必须各自保留、
+        # 互不吞并——真实生成路径不再产生重复 ID（构造绕过的防线在 commit
+        # 重算门，见 test_commit_recomputes_structure_and_rejects_broken_candidate）。
         # 4 页=2 批（BATCH_SLIDES_MAX=3）；两批 claim 均可定位（chk1/QUOTE1，
-        # 仅 text 不同），拦截责任唯一落在重复 ID 门上。
+        # 仅 text 不同）。
         seed_confirmed_plan(conn, slides=plan_slides(4))
         job = make_generate_job(conn, "job_dup")
         first = multi_proposal([("ps1", "clm1"), ("ps2", "clm2"), ("ps3", "clm3")])
@@ -1280,11 +1295,13 @@ class TestStructuralRecheck:
         )
         ref = GenerateService(conn, provider=provider).handle_generate(job)
         change = ChangeRepository(conn).get(ref.id)
-        assert change.status == "blocked"
-        # 门语义钉死：relations 必须检出跨批重复 ID（此前该形态被"同 ID 异
-        # 内容互相掩盖"绕过——locator 丢弃时 dangling 引用假通过）。
-        assert change.validation.relations_valid is False
-        assert change.validation.can_commit is False
+        assert change.status == "ready"
+        assert change.validation.relations_valid is True
+        texts = {c.id: c.text for c in change.candidate.claims}
+        assert texts["clm1"] == "NVIC优先级分组通过AIRCR配置。"
+        assert texts["clm1-b2"] == "第二批复用第一批临时 ID。"
+        s4 = next(s for s in change.candidate.slides if s.id == "ps4")
+        assert s4.blocks[0].claim_id == "clm1-b2"
 
     def test_commit_recomputes_structure_and_rejects_broken_candidate(self, conn):
         # commit 不信任存储报告字段：候选 deck 结构（claim/slide ID 唯一性、

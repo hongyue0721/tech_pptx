@@ -203,8 +203,10 @@ class GenerateService:
         missing_valid = True
         audit_valid = True
         block_refs_valid = True
+        # 跨批 claim id 全局唯一由服务器在合并边界保证（见 _merge_batch_global_ids）。
+        used_claim_ids: set[str] = set()
 
-        for batch in batches:
+        for bi, batch in enumerate(batches):
             hits_by_page = {
                 i: search_chunks(
                     self._conn, project_id=job.project_id,
@@ -235,9 +237,11 @@ class GenerateService:
                 block_refs_valid = False
                 warnings.extend(f"illustration 引用定位失败：{r}" for r in ref_failures)
             # 失败 claim 不进模型队列（locator 合法性由程序决定，verify.md）；
-            # invalid 记录本身就是 blocked 的依据。
+            # invalid 记录本身就是 blocked 的依据。本批 checks 以批内局部 id
+            # 收集，合并边界统一改名后再入全局（见 _merge_batch_global_ids）。
+            batch_checks: list[ClaimVerification] = []
             for cid, reason in failures.items():
-                claim_checks.append(
+                batch_checks.append(
                     ClaimVerification(
                         claim_id=cid, locator_status="invalid",
                         semantic_status="not_checked", reason=reason[:600],
@@ -256,7 +260,7 @@ class GenerateService:
                 unbound.extend(
                     u for u in batch_unbound if u.slide_id in required_audit_ids
                 )
-                claim_checks.extend(
+                batch_checks.extend(
                     verdicts_to_checks(located, checks_map, dup_ids, extra_ids)
                 )
             # 独立可见文字审计（循环①Q01）：与 claim 语义核验分离，零 claim 批
@@ -273,6 +277,10 @@ class GenerateService:
                         "可见文字审计未恰好覆盖本批必审页面（遗漏/重复/未知页均不采信）"
                     )
                 unbound.extend(batch_audit_unbound)
+            self._merge_batch_global_ids(
+                used_claim_ids, bi + 1, located, batch_slides, batch_checks
+            )
+            claim_checks.extend(batch_checks)
             claims.extend(located)
             slides.extend(batch_slides)
             warnings.extend(proposal.missing_evidence)
@@ -364,6 +372,38 @@ class GenerateService:
         return JobResultRef(type="change", id=change.id)
 
     # ---------- locator + 一次修复 ----------
+
+    @staticmethod
+    def _merge_batch_global_ids(
+        used_ids: set[str], batch_no: int,
+        located: list, batch_slides: list, batch_checks: list,
+    ) -> None:
+        """跨批 claim id 命名空间保证（T14 真实链两轮实锤）：模型每批只见本批、
+        各自从 c1 编号，碰撞是必然——全局唯一只能服务器保证；且改名必须收在
+        合并边界（第 4 次真实 generate：改名前置到 verify 请求里，模型不肯逐字
+        复制 c1-b3 长 id、按 c1 返回致整批 unknown）。同一局部 id 在
+        claims/fact 块/checks 三侧一致映射，verify 与 audit 模型始终只见局部 id。"""
+        renames: dict[str, str] = {}
+
+        def global_id(local: str) -> str:
+            if local not in renames:
+                new = local
+                if new in used_ids:
+                    new = f"{local}-b{batch_no}"
+                    while new in used_ids:
+                        new += "x"
+                renames[local] = new
+            return renames[local]
+
+        for claim in located:
+            claim.id = global_id(claim.id)
+        for check in batch_checks:
+            check.claim_id = global_id(check.claim_id)
+        for slide in batch_slides:
+            for block in slide.blocks:
+                if block.type == "fact":
+                    block.claim_id = global_id(block.claim_id)
+        used_ids.update(renames.values())
 
     def _locate_batch(self, job, batch, selected, proposal, provider, context,
                       content_body, content_ver):
