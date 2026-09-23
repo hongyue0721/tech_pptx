@@ -46,7 +46,7 @@ MaterialUploadAccepted返回material_id/job_id/duplicate；重复内容返回既
 
 ## 计划→生成→应用
 
-PlanRequest含corpus_revision。ConfirmPlanRequest含corpus_revision和教师调整后的slides、accepted_goal_indices和acknowledged=true（可改标题/顺序/选范围），服务端重新检查引用与coverage；`status=confirmed`由服务端决定。
+PlanRequest含corpus_revision。ConfirmPlanRequest含corpus_revision和教师调整后的slides、accepted_goal_indices和acknowledged=true（可改标题/顺序/选范围），服务端重新检查引用与coverage；`status=confirmed`由服务端决定。accepted_goal_indices与每页goal_indices均为集合语义，重复索引返回422 VALIDATION_ERROR。
 
 GenerateRequest必须含plan_id、corpus_revision、base_version（首轮为0）。成功job.result_ref指向change_id。教师从GET change查看结果，再发CommitRequest：base_version、corpus_revision、acknowledged=true。生成和应用分离是必要流程，不可省略。
 

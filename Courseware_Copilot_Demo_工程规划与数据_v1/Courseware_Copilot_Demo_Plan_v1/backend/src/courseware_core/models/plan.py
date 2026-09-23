@@ -1,9 +1,16 @@
 from typing import Literal
 
-from pydantic import Field
+from pydantic import Field, model_validator
 
 from .base import AwareDatetime, ContractModel, GoalIndex, ShortId
 from .deck import LayoutName
+
+
+def normalize_goal_indices(indices: list[int]) -> list[int]:
+    """目标索引集合语义的规范形。历史脏数据（T14 实测前端 checkbox 双源 bug
+    产出的重复索引）在读侧/回灌侧归一为业务真值=集合；新脏写入已被
+    ConfirmPlanRequest validator 拒收。"""
+    return sorted(set(indices))
 
 
 class ObjectiveCoverage(ContractModel):
@@ -42,3 +49,14 @@ class ConfirmPlanRequest(ContractModel):
     slides: list[PlanSlide] = Field(min_length=1, max_length=12)
     accepted_goal_indices: list[GoalIndex] = Field(min_length=1, max_length=8)
     acknowledged: Literal[True]
+
+    @model_validator(mode="after")
+    def _goal_indices_are_sets(self) -> "ConfirmPlanRequest":
+        # 接受范围与页面关联目标均为集合语义；重复索引意味着上游状态源失同步
+        # （T14 实测抓到前端 checkbox 双源 bug 曾产出 [0,0,1,2,3]），拒绝入库。
+        if len(self.accepted_goal_indices) != len(set(self.accepted_goal_indices)):
+            raise ValueError("accepted_goal_indices must be unique")
+        for slide in self.slides:
+            if len(slide.goal_indices) != len(set(slide.goal_indices)):
+                raise ValueError(f"slide {slide.id!r} goal_indices must be unique")
+        return self

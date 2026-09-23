@@ -154,3 +154,45 @@ def test_edit_unknown_target_reuses_domain_code(data_dir, project_id):
     assert rc == 1, env
     # 项目 current_version=0：受理门链 base_version 先拒（api.md 门链口径）
     assert env["payload"]["error"]["code"] == "VERSION_CONFLICT"
+
+
+def test_plan_confirm_as_is_normalizes_dirty_stored_indices(data_dir, project_id):
+    # T14-Review B1：CLI"按原样确认"回灌服务器计划数据——历史脏值（前端双源
+    # bug 产物：accepted 与 slides.goal_indices 均含重复索引）不得构造期崩溃，
+    # 且落库须为集合真值。
+    rc, env = run_cli(["material", "add", "--project", project_id,
+                       "--file", str(DEMO_PDF), "--data-dir", str(data_dir)])
+    assert rc == 0, env
+    db = sqlite3.connect(data_dir / "app.db")
+    db.row_factory = sqlite3.Row
+    chk = db.execute(
+        "SELECT chunk_id FROM chunks WHERE project_id = ? LIMIT 1", (project_id,)
+    ).fetchone()["chunk_id"]
+    plan_json = json.dumps({
+        "id": "plan_dirty", "project_id": project_id, "corpus_revision": 1,
+        "status": "draft",
+        "coverage": [{"goal_index": 0, "status": "supported",
+                      "chunk_ids": [chk], "note": ""}],
+        "slides": [{"id": "ps1", "title": "NVIC分组", "purpose": "讲解",
+                    "layout": "concept", "goal_indices": [0, 0],
+                    "evidence_chunk_ids": [chk]}],
+        "accepted_goal_indices": [0, 0],
+        "created_at": "2026-09-22T00:00:00+00:00",
+    }, ensure_ascii=False)
+    with db:
+        cur = db.execute(
+            "INSERT INTO plans (id, project_id, corpus_revision, status,"
+            " plan_json, created_at, updated_at)"
+            " VALUES (?, ?, 1, 'draft', ?, ?, ?)",
+            ("plan_dirty", project_id, plan_json,
+             "2026-09-22T00:00:00+00:00", "2026-09-22T00:00:00+00:00"),
+        )
+        assert cur.rowcount == 1
+    db.close()
+    rc, env = run_cli(["plan", "confirm", "--project", project_id,
+                       "--plan", "plan_dirty", "--corpus-revision", "1",
+                       "--data-dir", str(data_dir)])
+    assert rc == 0, env
+    assert env["payload"]["status"] == "confirmed"
+    assert env["payload"]["accepted_goal_indices"] == [0]
+    assert env["payload"]["slides"][0]["goal_indices"] == [0]

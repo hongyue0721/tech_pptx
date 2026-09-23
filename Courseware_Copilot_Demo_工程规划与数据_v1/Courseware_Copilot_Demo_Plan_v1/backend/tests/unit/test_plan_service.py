@@ -488,6 +488,103 @@ class TestConfirmPlan:
         with pytest.raises(PlanNotFound):
             service.confirm_plan("prj1", "plan_missing", request)
 
+    def test_confirm_replay_on_dirty_confirmed_plan_uses_set_semantics(self, conn):
+        # T14-Review B1：历史脏 confirmed plan（前端双源 bug 产物 [0,0]）被教师
+        # 以干净载荷重确认——接受范围业务真值是集合，同集合必须按幂等重放返回，
+        # 不得因 list 相等误判"载荷不同"而拒绝（教师被锁死在脏数据上）。
+        service, plan_id = self._draft_plan(conn)
+        request = ConfirmPlanRequest(
+            corpus_revision=1,
+            slides=[
+                {
+                    "id": "ps1",
+                    "title": "t",
+                    "purpose": "p",
+                    "layout": "concept",
+                    "goal_indices": [0],
+                    "evidence_chunk_ids": ["chk1"],
+                }
+            ],
+            accepted_goal_indices=[0],
+            acknowledged=True,
+        )
+        service.confirm_plan("prj1", plan_id, request)
+        row = conn.execute(
+            "SELECT plan_json FROM plans WHERE id=?", (plan_id,)
+        ).fetchone()
+        payload = json.loads(row["plan_json"])
+        payload["accepted_goal_indices"] = [0, 0]
+        with conn:
+            cur = conn.execute(
+                "UPDATE plans SET plan_json = ? WHERE id = ?",
+                (json.dumps(payload, ensure_ascii=False), plan_id),
+            )
+            assert cur.rowcount == 1
+        replay = service.confirm_plan("prj1", plan_id, request)
+        assert replay.status == "confirmed"
+
+    def test_confirm_replay_still_rejects_different_slides(self, conn):
+        # 守卫：集合语义不放行真实差异——同 accepted 但 slides 载荷不同仍显式拒绝。
+        service, plan_id = self._draft_plan(conn)
+        request = ConfirmPlanRequest(
+            corpus_revision=1,
+            slides=[
+                {
+                    "id": "ps1",
+                    "title": "t",
+                    "purpose": "p",
+                    "layout": "concept",
+                    "goal_indices": [0],
+                    "evidence_chunk_ids": ["chk1"],
+                }
+            ],
+            accepted_goal_indices=[0],
+            acknowledged=True,
+        )
+        service.confirm_plan("prj1", plan_id, request)
+        changed = request.model_copy(
+            update={"slides": [dict(request.slides[0], title="改过的")]}
+        )
+        with pytest.raises(ValidationFailed):
+            service.confirm_plan("prj1", plan_id, changed)
+
+
+class TestConfirmRequestSetInvariants:
+    """T14 live 实测抓到前端 toggle 双源 bug 产出 [0,0,1,2,3] 脏数组入库。
+    接受范围与页面关联目标都是集合语义，重复索引属契约违例，须在模型层拒绝。"""
+
+    def _slide(self, goal_indices):
+        return {
+            "id": "ps1",
+            "title": "t",
+            "purpose": "p",
+            "layout": "concept",
+            "goal_indices": goal_indices,
+            "evidence_chunk_ids": [],
+        }
+
+    def test_duplicate_accepted_goal_indices_rejected(self):
+        from pydantic import ValidationError
+
+        with pytest.raises(ValidationError, match="unique"):
+            ConfirmPlanRequest(
+                corpus_revision=1,
+                slides=[self._slide([0])],
+                accepted_goal_indices=[0, 0, 1],
+                acknowledged=True,
+            )
+
+    def test_duplicate_slide_goal_indices_rejected(self):
+        from pydantic import ValidationError
+
+        with pytest.raises(ValidationError, match="unique"):
+            ConfirmPlanRequest(
+                corpus_revision=1,
+                slides=[self._slide([1, 1])],
+                accepted_goal_indices=[0, 1],
+                acknowledged=True,
+            )
+
 
 class TestStaleOnRead:
     def test_get_plan_reports_stale_after_new_material(self, conn):

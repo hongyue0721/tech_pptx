@@ -40,6 +40,7 @@ from courseware_core.models import (
     PlanRequest,
     RestoreRequest,
 )
+from courseware_core.models.plan import normalize_goal_indices
 from courseware_core.services.export_service import (
     ExportService,
     artifact_filename,
@@ -188,10 +189,19 @@ def _cmd_plan_confirm(data: DataDir, ns) -> dict:
         else:
             # 缺省=教师"按原样确认"：slides/接受范围取服务器当前计划，
             # CLI 显式调用 confirm 即教师确认动作（docs/10 §5 工作流）。
+            # 回灌侧读归一化：历史脏存储（重复索引）不得构造期崩溃，
+            # 落库随 confirm 收敛为集合真值。
             request = ConfirmPlanRequest(
                 corpus_revision=ns.corpus_revision,
-                slides=plan.slides,
-                accepted_goal_indices=plan.accepted_goal_indices,
+                slides=[
+                    s.model_copy(
+                        update={"goal_indices": normalize_goal_indices(s.goal_indices)}
+                    )
+                    for s in plan.slides
+                ],
+                accepted_goal_indices=normalize_goal_indices(
+                    plan.accepted_goal_indices
+                ),
                 acknowledged=True,
             )
         return _dump(service.confirm_plan(ns.project, ns.plan, request))

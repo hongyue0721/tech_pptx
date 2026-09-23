@@ -310,9 +310,11 @@ class PlanService:
         if plan.status == "confirmed":
             # 幂等重放只认同载荷（N5）：已确认计划+不同 slides/范围 是矛盾请求，
             # 静默返回旧计划会掩盖教师意图丢失，须显式拒绝（要改范围走重新规划）。
+            # 接受范围按集合比较：历史脏存储（重复索引）与干净载荷同集合=重放。
             if (
                 request.slides == plan.slides
-                and request.accepted_goal_indices == plan.accepted_goal_indices
+                and set(request.accepted_goal_indices)
+                == set(plan.accepted_goal_indices)
             ):
                 return plan
             raise ValidationFailed(

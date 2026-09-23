@@ -3370,7 +3370,8 @@
               "maximum": 7
             },
             "minItems": 1,
-            "maxItems": 8
+            "maxItems": 8,
+            "uniqueItems": true
           },
           "acknowledged": {
             "const": true
