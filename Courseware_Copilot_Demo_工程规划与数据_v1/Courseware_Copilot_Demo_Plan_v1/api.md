@@ -48,7 +48,7 @@ MaterialUploadAccepted返回material_id/job_id/duplicate；重复内容返回既
 
 PlanRequest含corpus_revision。ConfirmPlanRequest含corpus_revision和教师调整后的slides、accepted_goal_indices和acknowledged=true（可改标题/顺序/选范围），服务端重新检查引用与coverage；`status=confirmed`由服务端决定。accepted_goal_indices与每页goal_indices均为集合语义，重复索引返回422 VALIDATION_ERROR。
 
-GenerateRequest必须含plan_id、corpus_revision、base_version（首轮为0）。成功job.result_ref指向change_id。教师从GET change查看结果，再发CommitRequest：base_version、corpus_revision、acknowledged=true。生成和应用分离是必要流程，不可省略。
+GenerateRequest必须含plan_id、corpus_revision、base_version（首轮为0）。成功job.result_ref指向change_id。教师从GET change查看结果，再发CommitRequest：base_version、corpus_revision、acknowledged=true。生成和应用分离是必要流程，不可省略。ADR-12 partial核准通道：候选"非绿全为partial"且missing/unbound为空时，CommitRequest可携带approved_partial_claim_ids逐条核准（教师人工确认）；清单必须与partial集精确相等——漏核准返回409 details.missing_partial_approvals，夹带非partial返回409 details.unknown_or_not_partial，清单内重复id返回422（与confirm集合语义同先例），全绿候选携带核准清单=载荷矛盾拒绝；unsupported/conflict/invalid/not_checked/missing_evidence/unbound一律不可核准放行。
 
 ## 编辑
 

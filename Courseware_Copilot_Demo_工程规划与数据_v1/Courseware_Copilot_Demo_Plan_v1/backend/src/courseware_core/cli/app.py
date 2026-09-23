@@ -210,10 +210,12 @@ def _cmd_plan_confirm(data: DataDir, ns) -> dict:
 
 
 def _cmd_change_commit(data: DataDir, ns) -> dict:
+    approved = [s.strip() for s in str(getattr(ns, "approve_partial", "")).split(",") if s.strip()]
     request = CommitRequest(
         base_version=ns.base_version,
         corpus_revision=ns.corpus_revision,
         acknowledged=True,
+        approved_partial_claim_ids=approved,
     )
 
     def work(conn):
@@ -473,6 +475,10 @@ def build_parser() -> argparse.ArgumentParser:
     cc.add_argument("--change", required=True)
     cc.add_argument("--base-version", type=int, required=True)
     cc.add_argument("--corpus-revision", type=int, required=True)
+    cc.add_argument(
+        "--approve-partial", default="",
+        help="逗号分隔的 partial claim id 核准清单（ADR-12 教师逐条核准）",
+    )
     data_arg(cc)
 
     return parser

@@ -60,7 +60,11 @@ from courseware_core.models import (
 )
 from courseware_core.retrieval.bm25 import search_chunks
 from courseware_core.retrieval.context import select_evidence_within_budget
-from courseware_core.services.claim_verdicts import map_verdicts, verdicts_to_checks
+from courseware_core.services.claim_verdicts import (
+    map_verdicts,
+    partial_approval_channel,
+    verdicts_to_checks,
+)
 from courseware_core.services.coverage_service import TOP_K
 from courseware_core.services.edit_patch import relations_valid
 from courseware_core.services.generate_messages import (
@@ -614,9 +618,34 @@ class GenerateService:
                 {"change_base": change.base_version,
                  "current": project.current_version}
             )
-        if change.status != "ready" or not change.validation.can_commit:
-            # blocked/committed/can_commit=false 一律拒绝：未经支持的
-            # 内容不得被一次点击盖绿（docs/04:41）。
+        channel = partial_approval_channel(change.validation)
+        if change.status == "ready" and change.validation.can_commit:
+            # 原路径：全绿候选不需要核准——夹带核准清单=载荷与候选矛盾，拒绝。
+            if request.approved_partial_claim_ids:
+                raise ChangeNotCommittable(
+                    {"change_id": change_id,
+                     "reason": "no partial to approve",
+                     "unknown_or_not_partial": request.approved_partial_claim_ids}
+                )
+        elif channel is not None and change.status == "blocked":
+            # ADR-12 教师核准通道：非绿全为 partial 且保守维度干净。
+            # 核准清单与 partial 集精确相等：漏核准、夹带核准都显式拒绝——
+            # 人工确认是加一道人审，不是绕过审核。
+            approved = set(request.approved_partial_claim_ids)
+            unknown = sorted(approved - set(channel))
+            if unknown:
+                raise ChangeNotCommittable(
+                    {"change_id": change_id, "unknown_or_not_partial": unknown}
+                )
+            missing = [p for p in channel if p not in approved]
+            if missing:
+                raise ChangeNotCommittable(
+                    {"change_id": change_id, "missing_partial_approvals": missing}
+                )
+        else:
+            # committed/discarded、unsupported/conflict/invalid/not_checked、
+            # missing_evidence、unbound 等一律维持：未经支持的内容不得被
+            # 一次点击盖绿（docs/04:41；保守规则仅 partial 一维经 ADR-12 放宽）。
             raise ChangeNotCommittable(
                 {"change_id": change_id, "status": change.status,
                  "can_commit": change.validation.can_commit}
@@ -642,7 +671,9 @@ class GenerateService:
             )
 
         def _mark(conn: sqlite3.Connection) -> None:
-            if not self._changes.mark_committed_tx(conn, change_id, _now_iso()):
+            if not self._changes.mark_committed_tx(
+                conn, change_id, _now_iso(), from_status=change.status
+            ):
                 # 指针 CAS 已过但候选态被并发改写：回滚整个提交。
                 raise VersionConflict({"change_id": change_id, "reason": "already committed"})
 

@@ -83,3 +83,28 @@ def verdicts_to_checks(
                 )
             )
     return checks
+
+
+def partial_approval_channel(report) -> list[str] | None:
+    """ADR-12 partial 核准通道的资格判定（服务器权威推导，前端同规则仅做展示）：
+
+    候选"非绿全为 partial"且其余保守维度干净（零 missing/unbound、schema/layout
+    过、checks 覆盖无重复）时，返回 partial claim id 清单（教师可逐条核准）；
+    任一维度不满足返回 None——unsupported/conflict/invalid/not_checked、
+    missing_evidence、unbound 一律不放宽（AGENT_00 保守规则只动 partial 一维）。
+    """
+    if report.warnings or report.unbound_assertions:
+        return None
+    if not report.schema_valid or not report.layout_valid:
+        return None
+    ids = [c.claim_id for c in report.claim_checks]
+    if not ids or len(ids) != len(set(ids)):
+        return None
+    partials = [c.claim_id for c in report.claim_checks
+                if c.semantic_status == "partial"]
+    if not partials:
+        return None
+    if any(c.semantic_status not in ("supported", "partial")
+           for c in report.claim_checks):
+        return None
+    return partials

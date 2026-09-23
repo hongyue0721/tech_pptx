@@ -129,18 +129,23 @@ class ChangeRepository:
         with self._conn:
             return self.mark_committed_tx(self._conn, change_id, _now_iso())
 
-    def mark_committed_tx(self, conn: sqlite3.Connection, change_id: str, now: str) -> bool:
+    def mark_committed_tx(
+        self, conn: sqlite3.Connection, change_id: str, now: str,
+        from_status: str = "ready",
+    ) -> bool:
         """在调用方事务内迁移状态（T09-Review N4：SQL 单一实现，不自开事务）。
 
         status 列与 change_json 内嵌 status 同一语句改写（json_set），
         否则 get() 从 JSON 读回的对外形状落后于列——双源漂移。
+        from_status=门读到的当前态（ADR-12 核准通道原态为 blocked）——
+        CAS 带原值，并发 commit 输家 rowcount=0。
         返回 False=状态已被他人迁移（并发 commit 输家）。
         """
         cur = conn.execute(
             "UPDATE changes SET status = 'committed',"
             " change_json = json_set(change_json, '$.status', 'committed'),"
             " updated_at = ?"
-            " WHERE id = ? AND status = 'ready'",
-            (now, change_id),
+            " WHERE id = ? AND status = ?",
+            (now, change_id, from_status),
         )
         return cur.rowcount > 0

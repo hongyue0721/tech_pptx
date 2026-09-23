@@ -1,6 +1,6 @@
 from typing import Literal
 
-from pydantic import Field
+from pydantic import Field, model_validator
 
 from .base import AwareDatetime, ContractModel, ShortId, WarningMessage
 from .deck import DeckSpec
@@ -39,6 +39,19 @@ class CommitRequest(ContractModel):
     base_version: int = Field(ge=0)
     corpus_revision: int = Field(ge=1)
     acknowledged: Literal[True]
+    # ADR-12：partial 教师核准通道——仅覆盖"非绿全为 partial"的候选；
+    # 清单必须与候选 partial 集精确相等（多核准/漏核准均显式拒绝）。
+    # 上限对齐 claim_checks 的 96（partial 集理论可超 16，16 会造成
+    # 教师全勾仍 422 的死锁——Review N1）；重复 id 拒绝与 confirm 集合
+    # 语义同先例（Review N2 双标纠偏）。
+    approved_partial_claim_ids: list[ShortId] = Field(default_factory=list, max_length=96)
+
+    @model_validator(mode="after")
+    def _approved_ids_unique(self) -> "CommitRequest":
+        ids = self.approved_partial_claim_ids
+        if len(ids) != len(set(ids)):
+            raise ValueError("approved_partial_claim_ids must be unique")
+        return self
 
 
 class RestoreRequest(ContractModel):

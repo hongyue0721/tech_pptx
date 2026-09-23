@@ -303,7 +303,13 @@ SAMPLES: dict[str, list[dict]] = {
         }
     ],
     "CommitRequest": [
-        {"base_version": 0, "corpus_revision": 1, "acknowledged": True}
+        {"base_version": 0, "corpus_revision": 1, "acknowledged": True},
+        {
+            "base_version": 1,
+            "corpus_revision": 2,
+            "acknowledged": True,
+            "approved_partial_claim_ids": ["c2", "c7-b3"],
+        },
     ],
     "RestoreRequest": [
         {

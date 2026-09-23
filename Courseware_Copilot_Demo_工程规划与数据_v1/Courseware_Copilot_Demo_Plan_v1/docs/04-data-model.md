@@ -38,7 +38,7 @@ CandidateChange保存base_version、corpus_revision、原始指令、改动页�
 
 ClaimVerification分别记录引用定位（located/invalid）与语义核验（supported/partial/unsupported/conflict/not_checked）。教师确认字段独立存在；不是把用户点击“应用”写成“AI已确认事实正确”。记录model_id、prompt_version、checked_at、原始结果hash。
 
-定义executable gate：所有正式fact的引用可解析、语义核验supported，所有跨对象关系有效，结构/布局通过，unbound_assertions为空且使用中的claim核验恰好全覆盖。存在partial/unsupported/conflict/not_checked则候选不准应用为正式版本。教师可先删除该教学目标或补材料再生成，不能点一次确认就给未经支持的内容盖绿章。
+定义executable gate：所有正式fact的引用可解析、语义核验supported，所有跨对象关系有效，结构/布局通过，unbound_assertions为空且使用中的claim核验恰好全覆盖。存在unsupported/conflict/not_checked/invalid则候选不准应用为正式版本。partial（部分依据）经ADR-12走教师逐条核准通道：commit须携带approved_partial_claim_ids与partial集精确相等（漏核准/夹带核准拒绝），且missing_evidence与unbound仍为零容忍——人工确认是加一道人审，不是点一次确认就给未经支持的内容盖绿章。
 
 ## 数据库建议表
 

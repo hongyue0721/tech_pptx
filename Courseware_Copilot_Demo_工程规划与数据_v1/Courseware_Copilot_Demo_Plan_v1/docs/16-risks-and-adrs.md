@@ -24,6 +24,8 @@ ADR-10（2026-09-20，修订 ADR-02 的"两个路由"限制）：前端以三个
 
 ADR-11（2026-09-21，负责人拍板）：T10 导出器采用 **python-pptx**（MIT，锁定 1.0.2，传递依赖 lxml/pillow/xlsxwriter 随 uv.lock 锁定）作为唯一激活导出路径，替代 docs/03 原规划"PptExportAdapter→经准入的 ppt-edit"。依据：R05（ppt-edit 镜像/patched WASM/字体授权）核验未闭合，按 R05 预定处理"不通过则切清晰依赖"执行；docs/08 字面备用 PptxGenJS 不激活——T02 探针已实测同类 OOXML 完整部件链在 WPS 打开/编辑/保存 L1-L3 全过，python-pptx 即该骨架的标准库实现（手写 OPC 链正是 T02 v1 缺链打不开的风险面）。本决策不改 ADR-04：DeckSpec 仍是唯一语义真源、PPTX 是派生产物、备选不并行维护；导出语义（固定 version、纯渲染不推理）以 docs/08 与 api.md 为准。若未来回到 ppt-edit 路线须修订本 ADR 并同步实际宣传。
 
+ADR-12（2026-09-23，负责人拍板"教师逐条核准 partial"）：executable gate 的 **partial 一维**增加教师核准通道。背景=T14 真实链系统性数据：4 次有效真实 generate（33~37 claims）每次 93-97% supported+located，但稳定产出 1-2 条 partial——全部为模型转写附加轻微限定（"重点"强调词、跨句指代补全、操作性细节），保守门（要求全 supported）每次正确拦下→live 提交→导出链在当前"模型+全 supported 门"组合下系统性不可达；docs/12 §3 又禁止无限重试碰运气。决策：仅 semantic_status=partial 且 missing_evidence、unbound、invalid、not_checked、unsupported、conflict 全部为零时，CommitRequest 可携带 approved_partial_claim_ids 逐条核准后应用；清单必须与 partial 集**精确相等**（漏核准→409 missing_partial_approvals、夹带非 partial→409 unknown_or_not_partial、全绿候选携带核准→409 载荷矛盾）；核准集并入前端幂等键（补核准=新意图）。边界：missing_evidence=模型自认缺依据、unbound=无绑定专业断言——两者维持 P0 零容忍不放宽；候选状态机不变（partial-only 仍 blocked，核准只作用于 commit 门）；commit 结构重算与 CAS 防线原样。语义：人工逐条对照资料确认是**加一道人审**（教师主体、AI 辅助的产品理念），不是"点一次确认盖绿章"；UI 无全选按钮、换候选即清核准、同候选 409 重读保留勾选。同步：docs/04 gate 段、api.md commit 段、models.schema.json/openapi.json CommitRequest、CLI change commit --approve-partial。
+
 ## 开工风险表
 
 | 编号 | 风险/未知 | 优先级 | 处理/门禁 |

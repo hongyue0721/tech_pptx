@@ -609,6 +609,155 @@ class TestCommitChange:
         with pytest.raises(ChangeNotCommittable):
             service.commit_change("prj1", change_id, req)
 
+
+# ---------- ADR-12：partial 教师核准通道（T14 真实链系统性发现驱动） ----------
+
+
+def _mixed_verdicts():
+    return SemanticVerdicts.model_validate(
+        {
+            "checks": [
+                {"claim_id": "clm1", "status": "supported", "reason": "原文支持。"},
+                {"claim_id": "clm2", "status": "partial", "reason": "表述超出片段限定。"},
+            ],
+            "unbound_assertions": [],
+        }
+    )
+
+
+def _partial_blocked_change(conn, job_id="job_pa"):
+    """2 页 2 claim，clm2 partial → blocked（仅 partial 非绿、零 missing 零 unbound）。"""
+    seed_confirmed_plan(conn, slides=plan_slides(2))
+    job = make_generate_job(conn, job_id)
+    provider = ScriptedProvider(
+        {
+            "generate_content": [multi_proposal([("ps1", "clm1"), ("ps2", "clm2")])],
+            "verify_claims": [_mixed_verdicts()],
+            "audit_visible_text": [audit_pass("ps1", "ps2")],
+        }
+    )
+    ref = GenerateService(conn, provider=provider).handle_generate(job)
+    _insert(conn, "UPDATE projects SET active_job_id=NULL WHERE id='prj1'")
+    change = ChangeRepository(conn).get(ref.id)
+    assert change.status == "blocked"
+    return ref.id
+
+
+class TestPartialApprovalCommit:
+    def test_duplicate_approved_ids_rejected(self):
+        # Review N2：重复核准与 confirm 集合语义同先例——模型层拒绝。
+        from pydantic import ValidationError
+
+        with pytest.raises(ValidationError, match="unique"):
+            CommitRequest(
+                base_version=0, corpus_revision=1, acknowledged=True,
+                approved_partial_claim_ids=["c2", "c2"],
+            )
+
+    def test_partial_only_candidate_commits_with_full_approval(self, conn):
+        change_id = _partial_blocked_change(conn)
+        service = GenerateService(conn)
+        version = service.commit_change(
+            "prj1", change_id,
+            CommitRequest(base_version=0, corpus_revision=1, acknowledged=True,
+                          approved_partial_claim_ids=["clm2"]),
+        )
+        assert version.version == 1
+        assert service.get_change("prj1", change_id).status == "committed"
+
+    def test_missing_partial_approval_rejected_with_detail(self, conn):
+        change_id = _partial_blocked_change(conn, "job_pa2")
+        service = GenerateService(conn)
+        with pytest.raises(ChangeNotCommittable) as exc:
+            service.commit_change(
+                "prj1", change_id,
+                CommitRequest(base_version=0, corpus_revision=1, acknowledged=True),
+            )
+        assert "clm2" in exc.value.details.get("missing_partial_approvals", [])
+
+    def test_approving_non_partial_id_rejected(self, conn):
+        # 核准清单必须精确落在 partial 集内——夹带核准（supported/未知 id）拒绝，
+        # 防前端 bug 或构造请求借通道放行未审内容。
+        change_id = _partial_blocked_change(conn, "job_pa3")
+        service = GenerateService(conn)
+        with pytest.raises(ChangeNotCommittable) as exc:
+            service.commit_change(
+                "prj1", change_id,
+                CommitRequest(base_version=0, corpus_revision=1, acknowledged=True,
+                              approved_partial_claim_ids=["clm2", "ghost"]),
+            )
+        assert "ghost" in exc.value.details.get("unknown_or_not_partial", [])
+
+    def test_unsupported_never_entered_approval_channel(self, conn):
+        seed_confirmed_plan(conn)
+        job = make_generate_job(conn, "job_pa4")
+        provider = ScriptedProvider(
+            {"generate_content": [content_proposal()],
+             "verify_claims": [verdicts("clm1", status="unsupported")],
+             "audit_visible_text": [audit_pass("ps1")]}
+        )
+        ref = GenerateService(conn, provider=provider).handle_generate(job)
+        _insert(conn, "UPDATE projects SET active_job_id=NULL WHERE id='prj1'")
+        service = GenerateService(conn)
+        with pytest.raises(ChangeNotCommittable):
+            service.commit_change(
+                "prj1", ref.id,
+                CommitRequest(base_version=0, corpus_revision=1, acknowledged=True,
+                              approved_partial_claim_ids=["clm1"]),
+            )
+
+    def test_partial_with_missing_evidence_not_approvable(self, conn):
+        # missing_evidence=模型自认缺依据（P0 保守门），不在核准通道内——
+        # 保守规则只放宽 partial 一维，其余原样。
+        seed_confirmed_plan(conn, slides=plan_slides(2))
+        job = make_generate_job(conn, "job_pa5")
+        prop = multi_proposal([("ps1", "clm1"), ("ps2", "clm2")])
+        prop.missing_evidence = ["缺少具体数值来源，影响 ps2。"]
+        provider = ScriptedProvider(
+            {"generate_content": [prop],
+             "verify_claims": [_mixed_verdicts()],
+             "audit_visible_text": [audit_pass("ps1", "ps2")]}
+        )
+        ref = GenerateService(conn, provider=provider).handle_generate(job)
+        _insert(conn, "UPDATE projects SET active_job_id=NULL WHERE id='prj1'")
+        service = GenerateService(conn)
+        with pytest.raises(ChangeNotCommittable):
+            service.commit_change(
+                "prj1", ref.id,
+                CommitRequest(base_version=0, corpus_revision=1, acknowledged=True,
+                              approved_partial_claim_ids=["clm2"]),
+            )
+
+    def test_all_supported_with_stray_approval_rejected(self, conn):
+        # 全 supported 候选无需核准：approved 非空=载荷与候选矛盾，显式拒绝。
+        seed_confirmed_plan(conn)
+        change_id = _ready_change_id(conn)
+        service = GenerateService(conn)
+        with pytest.raises(ChangeNotCommittable):
+            service.commit_change(
+                "prj1", change_id,
+                CommitRequest(base_version=0, corpus_revision=1, acknowledged=True,
+                              approved_partial_claim_ids=["clm1"]),
+            )
+
+    def test_structural_recheck_not_bypassed_by_approval(self, conn):
+        # 核准只替换"报告门"，commit 结构重算防线原样生效。
+        change_id = _partial_blocked_change(conn, "job_pa6")
+        row = conn.execute(
+            "SELECT change_json FROM changes WHERE id = ?", (change_id,)
+        ).fetchone()
+        payload = json.loads(row["change_json"])
+        payload["candidate"]["claims"].append(dict(payload["candidate"]["claims"][0]))
+        _insert(conn, "UPDATE changes SET change_json = ? WHERE id = ?",
+                json.dumps(payload, ensure_ascii=False), change_id)
+        service = GenerateService(conn)
+        with pytest.raises(ChangeNotCommittable):
+            service.commit_change(
+                "prj1", change_id,
+                CommitRequest(base_version=0, corpus_revision=1, acknowledged=True,
+                              approved_partial_claim_ids=["clm2"]),
+            )
+
     def test_request_base_mismatch_rejected(self, conn):
         seed_confirmed_plan(conn)
         change_id = _ready_change_id(conn)
