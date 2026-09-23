@@ -56,8 +56,13 @@ export function generateKey(
   return stableKey("gen", projectId, planId, baseVersion, corpusRevision, attempt);
 }
 
-export function commitKey(projectId: string, changeId: string): string {
-  return stableKey("commit", projectId, changeId);
+export function commitKey(
+  projectId: string,
+  changeId: string,
+  approvedPartial: string[] = [],
+): string {
+  // 核准集并入键：教师补核准后=新意图，不得重放旧拒绝（ADR-12）。
+  return stableKey("commit", projectId, changeId, [...approvedPartial].sort().join(","));
 }
 
 export function editKey(

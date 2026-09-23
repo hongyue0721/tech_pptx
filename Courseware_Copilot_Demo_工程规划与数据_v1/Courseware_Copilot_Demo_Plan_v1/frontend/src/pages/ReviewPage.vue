@@ -18,6 +18,7 @@ import StatusTag from "../components/common/StatusTag.vue";
 import CourseShell from "../layouts/CourseShell.vue";
 import { useEditFlow } from "../composables/useEditFlow";
 import { useEscapeClose } from "../composables/useEscapeClose";
+import { partialApprovalChannel } from "../utils/approvalChannel";
 import type {
   CandidateChange,
   CommitRequest,
@@ -34,6 +35,24 @@ const project = ref<Project | null>(null);
 const change = ref<CandidateChange | null>(null);
 const deck = ref<DeckSpec | null>(null);
 const loadError = ref("");
+
+// ADR-12 教师逐条核准状态：channel=服务器同规则派生的可核准 partial 集。
+const approvedPartials = ref<string[]>([]);
+const approvalChannel = computed(() =>
+  change.value ? partialApprovalChannel(change.value.validation) : null,
+);
+const allPartialsApproved = computed(() => {
+  const ch = approvalChannel.value;
+  if (!ch || ch.length === 0) return false;
+  return ch.every((id) => approvedPartials.value.includes(id));
+});
+
+function toggleApprove(claimId: string): void {
+  approvedPartials.value = approvedPartials.value.includes(claimId)
+    ? approvedPartials.value.filter((x) => x !== claimId)
+    : [...approvedPartials.value, claimId];
+}
+
 const activeTab = ref<"content" | "evidence" | "checks">("content");
 const inspectorOpen = ref(false);
 const evidenceOpen = ref(false);
@@ -113,12 +132,13 @@ const changeState = computed(() => {
   return { tone: "failed" as const, label: "候选未通过核验" };
 });
 
-const canApply = computed(
-  () =>
-    change.value?.status === "ready" &&
-    change.value.validation.can_commit === true &&
-    version.value === null,
-);
+const canApply = computed(() => {
+  const ch = change.value;
+  if (!ch || version.value !== null) return false;
+  if (ch.status === "ready" && ch.validation.can_commit === true) return true;
+  // ADR-12：blocked 且非绿全为 partial——教师逐条核准全部完成后可应用。
+  return ch.status === "blocked" && allPartialsApproved.value;
+});
 
 const applying = ref(false);
 const applyError = ref("");
@@ -129,6 +149,9 @@ const applyDisabledReason = computed(() => {
   if (ch.status === "committed") return "该候选已应用为正式版本";
   if (ch.status === "stale") return "候选基线已过期，请重新生成后再确认";
   if (ch.status === "discarded") return "候选已被丢弃，不可应用";
+  if (ch.status === "blocked" && approvalChannel.value) {
+    return "请在核验报告中逐条核准全部部分依据项";
+  }
   if (ch.status !== "ready") return "候选未通过服务器核验，不可应用";
   if (!ch.validation.can_commit) return "存在未获服务器支持的事实，不可应用";
   if (version.value !== null) return "正在查看正式版本，切回候选视图后可应用";
@@ -140,13 +163,18 @@ async function applyChange(): Promise<void> {
   if (!ch || !canApply.value || applying.value) return;
   applying.value = true;
   applyError.value = "";
+  const approved =
+    ch.status === "blocked" ? [...(approvalChannel.value ?? [])] : [];
   const body: CommitRequest = {
     base_version: ch.base_version,
     corpus_revision: ch.corpus_revision,
     acknowledged: true,
+    approved_partial_claim_ids: approved,
   };
   try {
-    const dv = await changesApi.commit(props.id, ch.id, body, commitKey(props.id, ch.id));
+    const dv = await changesApi.commit(
+      props.id, ch.id, body, commitKey(props.id, ch.id, approved),
+    );
     // 不乐观改写本地状态：跳转正式版本视图后由 load() 从服务器重读 change/deck。
     await router.push({
       name: "review",
@@ -203,6 +231,8 @@ async function load(): Promise<void> {
     if (changeId.value) {
       const ch = await changesApi.get(props.id, changeId.value, controller.signal);
       if (myEpoch !== epoch) return;
+      // 换候选=换审查对象：清核准；同候选重读（409 后刷新真值）保留教师已勾选。
+      if (change.value?.id !== ch.id) approvedPartials.value = [];
       change.value = ch;
     }
     if (version.value !== null) {
@@ -421,7 +451,13 @@ const footerText = computed(() => {
           <EvidencePanel :slide="selectedSlide" :claims="currentDeck?.claims ?? []" @open-evidence="openEvidence" />
         </div>
         <div v-else class="tab-body">
-          <ValidationPanel v-if="change && isCandidate" :change="change" />
+          <ValidationPanel
+            v-if="change && isCandidate"
+            :change="change"
+            :approvable="approvalChannel"
+            :approved="approvedPartials"
+            @toggle-approve="toggleApprove"
+          />
           <p v-else class="ins-hint">正式版本没有独立核验报告；核验结论以生成时的候选记录为准。</p>
         </div>
         <div v-if="activeTab === 'content' && currentDeck" class="tab-extra">

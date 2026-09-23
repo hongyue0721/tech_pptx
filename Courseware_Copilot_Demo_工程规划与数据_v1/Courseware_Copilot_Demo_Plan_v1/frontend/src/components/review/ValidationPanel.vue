@@ -4,7 +4,26 @@ import { computed, ref } from "vue";
 import StatusTag from "../common/StatusTag.vue";
 import type { CandidateChange, Claim, ClaimVerification } from "../../types/models";
 
-const props = defineProps<{ change: CandidateChange }>();
+const props = defineProps<{
+  change: CandidateChange;
+  // ADR-12：approvable=服务器同规则的 partial 核准通道（null=不可走通道）
+  approvable?: string[] | null;
+  approved?: string[];
+}>();
+const emit = defineEmits<{ (e: "toggle-approve", claimId: string): void }>();
+
+const approvalOpen = computed(
+  () => props.change.status === "blocked" && (props.approvable?.length ?? 0) > 0,
+);
+const approvedSet = computed(() => new Set(props.approved ?? []));
+const partialChecks = computed(() =>
+  props.change.validation.claim_checks.filter(
+    (ck) => ck.semantic_status === "partial" && ck.locator_status === "located",
+  ),
+);
+const approvedCount = computed(
+  () => (props.approvable ?? []).filter((id) => approvedSet.value.has(id)).length,
+);
 
 const claimsById = computed(() => {
   const map = new Map<string, Claim>();
@@ -99,6 +118,28 @@ const checkedAtText = computed(() => {
         <p class="vp-reason">{{ ck.reason }}</p>
       </li>
     </ul>
+
+    <section v-if="approvalOpen" class="vp-approval" aria-label="教师逐条核准">
+      <h3 class="vp-sub">教师逐条核准（{{ approvedCount }}/{{ (props.approvable ?? []).length }}）</h3>
+      <p class="vp-hint">
+        以下表述被核验为"部分依据"：请逐条对照资料原意自行判断是否可接受；
+        全部核准后才能应用为正式版本，漏核准或夹带核准都会被服务器拒绝。
+      </p>
+      <ul class="vp-list">
+        <li v-for="ck in partialChecks" :key="`ap-${ck.claim_id}`">
+          <label class="vp-approve">
+            <input
+              type="checkbox"
+              :checked="approvedSet.has(ck.claim_id)"
+              @change="emit('toggle-approve', ck.claim_id)"
+            />
+            我已对照资料，核准此条（{{ ck.claim_id }}）
+          </label>
+          <p class="vp-claim">{{ claimText(ck.claim_id) }}</p>
+          <p class="vp-reason">{{ ck.reason }}</p>
+        </li>
+      </ul>
+    </section>
 
     <template v-if="passedChecks.length">
       <button
@@ -205,4 +246,20 @@ const checkedAtText = computed(() => {
   padding-bottom: 0;
   color: var(--cc-ink-weak);
 }
+.vp-approval {
+  border: 1px solid var(--cc-line);
+  border-radius: 8px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.vp-approve {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
 </style>

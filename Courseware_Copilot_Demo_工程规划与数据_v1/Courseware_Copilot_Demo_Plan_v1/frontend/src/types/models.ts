@@ -280,6 +280,7 @@ export interface CommitRequest {
   base_version: number;
   corpus_revision: number;
   acknowledged: true;
+  approved_partial_claim_ids?: string[];
 }
 
 export interface EditRequest {
