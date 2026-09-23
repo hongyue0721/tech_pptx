@@ -1,4 +1,5 @@
 import fcntl
+import logging
 import os
 import secrets
 import threading
@@ -16,6 +17,8 @@ from courseware_core.materials.gc import cleanup_orphan_material_files
 from courseware_core.models import ErrorDetail, ErrorResponse, Job, JobResultRef
 from courseware_core.storage.database import connect
 from courseware_core.storage.job_repository import JobRepository
+
+LOG = logging.getLogger(__name__)
 
 JobHandler = Callable[[Job], Optional[JobResultRef]]
 
@@ -165,6 +168,12 @@ class JobWorker:
                 job.id, "failed", error=_error_response(exc.code, exc.message, exc.details)
             )
         except Exception:
+            # 栈必须留服务器日志：DB 里只有 INTERNAL_ERROR 信封，无栈则生产
+            # 失败无法定位根因（T14 实测缺口）。不记录凭据，仅异常本身。
+            LOG.exception(
+                "job %s (kind=%s, project=%s) failed with unhandled exception",
+                job.id, job.kind, job.project_id,
+            )
             repo.finalize(
                 job.id,
                 "failed",

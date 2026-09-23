@@ -131,6 +131,26 @@ def test_worker_marks_handler_domain_error_as_failed(db_path):
         conn.close()
 
 
+def test_worker_unexpected_exception_logs_traceback(db_path, caplog):
+    # T14 实测诊断性缺口：INTERNAL_ERROR 无栈留痕导致生产 job 失败无法定位
+    # （api.log 只有 finalize 记录，根因随异常吞没）。栈必须进服务器日志。
+    import logging
+
+    def _boom(job: Job):
+        raise RuntimeError("kaboom-with-traceback")
+
+    seed_job(db_path, "job_t", status="queued")
+    worker = JobWorker(db_path, handlers={"parse": _boom}, poll_interval=0.02)
+    with caplog.at_level(logging.ERROR):
+        worker.start()
+        try:
+            assert wait_until(lambda: job_status(db_path, "job_t") == "failed")
+        finally:
+            worker.stop()
+    assert "kaboom-with-traceback" in caplog.text
+    assert "RuntimeError" in caplog.text
+
+
 def test_worker_marks_unexpected_exception_as_failed(db_path):
     def _boom(job: Job):
         raise RuntimeError("kaboom")
