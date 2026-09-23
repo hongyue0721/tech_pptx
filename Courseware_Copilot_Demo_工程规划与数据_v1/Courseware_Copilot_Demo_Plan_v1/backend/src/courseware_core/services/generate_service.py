@@ -246,17 +246,24 @@ class GenerateService:
             batch_verdicts = self._verify_batch(
                 job, located, batch_slides, provider, context, verify_body, verify_ver
             )
+            # 可审计域=本批页面去掉教师计划豁免的封面页（layout=title 真值来自
+            # 计划批，非模型自报）。T14 实测：真实模型会把豁免页文字报进
+            # unbound——越域条目与双射纪律同源，不得参与核验门。
+            required_audit_ids = set(self._required_audit_ids(batch, batch_slides))
             if batch_verdicts is not None:
                 checks_map, dup_ids, batch_unbound, raw_sha, extra_ids = batch_verdicts
                 verdict_hashes.append(raw_sha)
-                unbound.extend(batch_unbound)
+                unbound.extend(
+                    u for u in batch_unbound if u.slide_id in required_audit_ids
+                )
                 claim_checks.extend(
                     verdicts_to_checks(located, checks_map, dup_ids, extra_ids)
                 )
             # 独立可见文字审计（循环①Q01）：与 claim 语义核验分离，零 claim 批
             # 也必须过；豁免判据=教师计划 layout=title，模型自报 title 不算豁免。
             batch_audit = self._audit_batch(
-                job, batch, batch_slides, located, provider, context, audit_body, audit_ver
+                job, batch, batch_slides, located, provider, context,
+                audit_body, audit_ver, required_audit_ids
             )
             if batch_audit is not None:
                 audit_ok, batch_audit_unbound = batch_audit
@@ -471,17 +478,24 @@ class GenerateService:
         raw_sha = canonical_sha(verdicts.model_dump(mode="json"))
         return checks_map, duplicate_ids, list(verdicts.unbound_assertions), raw_sha, extra_ids
 
+    @staticmethod
+    def _required_audit_ids(batch, batch_slides) -> list[str]:
+        """可审计页集合：本批输出页去掉教师计划豁免的封面页。豁免真值取计划批
+        layout（模型自报 layout 不算豁免）。verify 与 audit 两通道共用一份。"""
+        exempt = {s.id for s in batch if s.layout == "title"}
+        return [s.id for s in batch_slides if s.id not in exempt]
+
     def _audit_batch(self, job, batch, batch_slides, located, provider, context,
-                     audit_body, audit_ver):
+                     audit_body, audit_ver, required_audit_ids):
         """独立可见文字审计（循环①Q01）：与 claim 核验分离的必过通道。
 
         豁免判据=教师计划页 layout=title（模型自报 layout 不算豁免）；
         服务端对 audited_slide_ids 与必审页集合做双射核验——遗漏/重复/未知
         ID 任一命中即整批审计无效（不得因模型少审而盖绿）。
+        unbound_assertions 同域过滤：越域条目（豁免页/未知页）不得参与门。
         返回 None=本批全部为教师确认的封面页，合法豁免；否则 (ok, unbound)。
         """
-        exempt = {s.id for s in batch if s.layout == "title"}
-        required = [s.id for s in batch_slides if s.id not in exempt]
+        required = sorted(required_audit_ids)
         if not required:
             return None
         self._jobs.set_stage(job.id, "validating")
@@ -494,8 +508,8 @@ class GenerateService:
             "audit_visible_text", "VisibleTextAudit", messages, context
         ).value
         audited = audit.audited_slide_ids
-        ok = sorted(audited) == sorted(required)
-        return ok, list(audit.unbound_assertions)
+        ok = sorted(audited) == required
+        return ok, [u for u in audit.unbound_assertions if u.slide_id in required_audit_ids]
 
     # ---------- 结构与门 ----------
 

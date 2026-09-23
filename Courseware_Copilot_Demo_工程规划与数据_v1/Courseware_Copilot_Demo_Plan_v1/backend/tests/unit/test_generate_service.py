@@ -1312,3 +1312,87 @@ class TestStructuralRecheck:
         assert conn.execute(
             "SELECT COUNT(*) c FROM deck_versions"
         ).fetchone()["c"] == 0
+
+
+# ---------- T14 实测：越域 unbound 条目不得参与门 ----------
+
+
+def plan_slides_title_plus():
+    return [
+        {"id": "ps0", "title": "STM32中断基础", "purpose": "封面", "layout": "title",
+         "goal_indices": [0], "evidence_chunk_ids": []},
+        {"id": "ps1", "title": "NVIC分组", "purpose": "讲解AIRCR配置", "layout": "concept",
+         "goal_indices": [0], "evidence_chunk_ids": ["chk1"]},
+    ]
+
+
+def title_plus_proposal():
+    return ContentProposal.model_validate(
+        {
+            "claims": [{"id": "clm1", "text": "NVIC优先级分组通过AIRCR配置。",
+                        "kind": "direct",
+                        "evidence_refs": [{"chunk_id": "chk1", "quote": QUOTE1}],
+                        "rationale": None}],
+            "slides": [
+                {"id": "ps0", "title": "STM32中断基础", "layout": "title",
+                 "blocks": [{"type": "teaching", "text": "本节主题引入。"}]},
+                {"id": "ps1", "title": "NVIC分组", "layout": "concept",
+                 "blocks": [{"type": "fact", "claim_id": "clm1"}]},
+            ],
+            "missing_evidence": [],
+        }
+    )
+
+
+def unbound_entry(slide_id, field_path="title"):
+    return {"slide_id": slide_id, "field_path": field_path,
+            "text": "STM32中断基础", "reason": "片段未出现STM32字样。"}
+
+
+class TestUnboundDomainFilter:
+    """T14 真实链实测：deepseek 把豁免封面页（layout=title，教师声明非事实断言）
+    的标题报进 unbound_assertions。越域条目与 audited_slide_ids 双射纪律同源——
+    不得进入核验门，否则豁免规则被模型越权输出架空。"""
+
+    def test_audit_channel_unbound_on_exempt_page_filtered(self, conn):
+        seed_confirmed_plan(conn, slides=plan_slides_title_plus())
+        job = make_generate_job(conn, "job_df1")
+        provider = ScriptedProvider(
+            {"generate_content": [title_plus_proposal()],
+             "verify_claims": [verdicts("clm1")],
+             "audit_visible_text": [audit_unbound(["ps1"], [unbound_entry("ps0")])]}
+        )
+        service = GenerateService(conn, provider=provider)
+        ref = service.handle_generate(job)
+        change = ChangeRepository(conn).get(ref.id)
+        assert change.status == "ready"
+        assert change.validation.can_commit is True
+        assert change.validation.unbound_assertions == []
+
+    def test_verify_channel_unbound_on_exempt_page_filtered(self, conn):
+        seed_confirmed_plan(conn, slides=plan_slides_title_plus())
+        job = make_generate_job(conn, "job_df2")
+        provider = ScriptedProvider(
+            {"generate_content": [title_plus_proposal()],
+             "verify_claims": [verdicts("clm1", unbound=[unbound_entry("ps0")])],
+             "audit_visible_text": [audit_pass("ps1")]}
+        )
+        service = GenerateService(conn, provider=provider)
+        ref = service.handle_generate(job)
+        change = ChangeRepository(conn).get(ref.id)
+        assert change.status == "ready"
+        assert change.validation.unbound_assertions == []
+
+    def test_unbound_on_content_page_still_blocks(self, conn):
+        seed_confirmed_plan(conn, slides=plan_slides_title_plus())
+        job = make_generate_job(conn, "job_df3")
+        provider = ScriptedProvider(
+            {"generate_content": [title_plus_proposal()],
+             "verify_claims": [verdicts("clm1", unbound=[unbound_entry("ps1")])],
+             "audit_visible_text": [audit_pass("ps1")]}
+        )
+        service = GenerateService(conn, provider=provider)
+        ref = service.handle_generate(job)
+        change = ChangeRepository(conn).get(ref.id)
+        assert change.status == "blocked"
+        assert len(change.validation.unbound_assertions) == 1
