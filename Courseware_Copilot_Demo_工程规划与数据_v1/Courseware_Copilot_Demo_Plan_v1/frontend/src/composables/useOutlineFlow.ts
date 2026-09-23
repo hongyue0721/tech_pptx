@@ -67,7 +67,9 @@ export function useOutlineFlow(
 
   function resetFromPlan(p: LessonPlan): void {
     editedSlides.value = JSON.parse(JSON.stringify(p.slides)) as PlanSlide[];
-    acceptedGoals.value = [...p.accepted_goal_indices];
+    // 历史脏数据（T14 实测前的 toggle 双源 bug 产出重复索引）读侧归一化：
+    // 接受范围的业务真值是集合；新脏数据已被后端 validator 拒收。
+    acceptedGoals.value = [...new Set(p.accepted_goal_indices)].sort((a, b) => a - b);
     reviewed.value = false;
     flowError.value = "";
     confirming.value = false;
@@ -88,10 +90,18 @@ export function useOutlineFlow(
     return acceptedGoals.value.includes(goalIndex);
   }
 
-  function toggleGoal(goalIndex: number, checked: boolean): void {
+  // checkbox 的 :checked 绑定值在"拒绝翻转"路径上不变，Vue diff 会跳过 DOM 更新，
+  // 原生控件停留在用户点击后的错误态——epoch 进 :key 强制重建回写数组真值。
+  const goalToggleEpoch = ref(0);
+
+  function toggleGoal(goalIndex: number): void {
     flowError.value = "";
-    if (checked) {
-      if (!goalAcceptable(goalIndex)) return;
+    // 以 acceptedGoals 为单一事实源派生当前态，不信任事件携带的 DOM checked
+    if (!isGoalAccepted(goalIndex)) {
+      if (!goalAcceptable(goalIndex)) {
+        goalToggleEpoch.value += 1;
+        return;
+      }
       acceptedGoals.value = [...acceptedGoals.value, goalIndex].sort((a, b) => a - b);
       return;
     }
@@ -100,6 +110,7 @@ export function useOutlineFlow(
     const blockers = editedSlides.value.filter((s) => s.goal_indices.includes(goalIndex));
     if (blockers.length > 0) {
       flowError.value = `目标${goalIndex + 1}仍被 ${blockers.length} 个页面引用，请先调整这些页面再取消接受。`;
+      goalToggleEpoch.value += 1;
       return;
     }
     acceptedGoals.value = acceptedGoals.value.filter((g) => g !== goalIndex);
@@ -226,6 +237,7 @@ export function useOutlineFlow(
     goalAcceptable,
     isGoalAccepted,
     toggleGoal,
+    goalToggleEpoch,
     moveSlide,
     confirmAndGenerate,
     startGeneration,

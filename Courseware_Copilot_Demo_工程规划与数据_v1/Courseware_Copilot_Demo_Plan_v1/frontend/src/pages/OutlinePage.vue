@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { AButton } from "@any-design/anyui/vue";
-import { computed, onBeforeUnmount, ref, watch } from "vue";
+import { computed, nextTick, onBeforeUnmount, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 
 import { api } from "../api/client";
@@ -52,8 +52,24 @@ const {
   editedSlides, acceptedGoals, reviewed, confirming, generating, flowError, job, pollError, isPolling,
   cancelling, requestCancel,
   isConfirmed, isStale, readOnly,
-  goalAcceptable, isGoalAccepted, toggleGoal,
+  goalAcceptable, isGoalAccepted, toggleGoal, goalToggleEpoch,
 } = flow;
+
+// T14-Review N2：拒绝回写经 epoch 重建 checkbox，键盘焦点会掉——重建后还原到同目标。
+let goalFocusIndex: number | null = null;
+
+function onGoalToggle(goalIndex: number): void {
+  goalFocusIndex = goalIndex;
+  toggleGoal(goalIndex);
+}
+
+watch(goalToggleEpoch, async () => {
+  if (goalFocusIndex === null) return;
+  await nextTick();
+  document
+    .querySelector<HTMLInputElement>(`.goal-list input[data-goal-index="${goalFocusIndex}"]`)
+    ?.focus();
+});
 
 async function handleCancel(): Promise<void> {
   const msg = await requestCancel();
@@ -182,10 +198,12 @@ const primaryTitle = computed(() => {
           <li v-for="c in plan.coverage" :key="c.goal_index">
             <label class="goal-check" :title="goalAcceptable(c.goal_index) ? '' : '缺口/冲突目标不可接受'">
               <input
+                :key="'goal-' + c.goal_index + '-' + goalToggleEpoch"
+                :data-goal-index="c.goal_index"
                 type="checkbox"
                 :checked="isGoalAccepted(c.goal_index)"
                 :disabled="readOnly || !goalAcceptable(c.goal_index)"
-                @change="toggleGoal(c.goal_index, ($event.target as HTMLInputElement).checked)"
+                @change="onGoalToggle(c.goal_index)"
               />
             </label>
             <div>
