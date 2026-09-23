@@ -22,9 +22,29 @@ def content_prompt() -> tuple[str, str]:
 
 def test_content_prompt_version_bumped(content_prompt):
     version, _ = content_prompt
-    assert version == "content-v4", (
-        "kind 枚举（v2）、blocks 结构（v3）、schema 边界声明（v4）都必须升版本"
+    assert version == "content-v5", (
+        "kind 枚举（v2）、blocks 结构（v3）、schema 边界声明（v4）、"
+        "quote 逐字与 missing_evidence 定义（v5）都必须升版本"
         "（R00-A：改 prompt 必须 bump，真实模型行为差异需版本可追溯）"
+    )
+
+
+def test_content_prompt_states_quote_verbatim_substring(content_prompt):
+    _, body = content_prompt
+    # T13/T14 真实模型反复产出非逐字 quote（locator invalid 首要原因）
+    assert "逐字连续子串" in body, "quote 必须声明为 chunk 文本的逐字连续子串"
+    assert "不得改写" in body and "省略标点" in body, "必须逐项否定改写/翻译/拼接/省略"
+
+
+def test_content_prompt_defines_missing_evidence_scope(content_prompt):
+    _, body = content_prompt
+    # T14 实测：模型把"资料声明不覆盖的边界"过度上报为 missing_evidence，
+    # 保守门非空即 blocked——定义必须区分"想写而无据"与"已声明不教"。
+    assert "找不到支持" in body, "missing_evidence 必须限定为计划写入内容缺支持"
+    assert "不是缺口，不得上报" in body, "已声明边界不得计为缺口"
+    assert "返回空数组" in body, "必须显式允许 missing_evidence 为空"
+    assert "仍必须上报" in body and "隐瞒" in body, (
+        "封口：不得为过核验门隐瞒真实缺口（T14-Review O 项）"
     )
 
 

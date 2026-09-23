@@ -1,8 +1,8 @@
-# APP content / v4
+# APP content / v5
 
 任务：按教师已确认的计划与给出的资料片段产生候选课件语义内容。
 
-输出严格ContentProposal JSON。claims使用ClaimProposal：kind只能是"direct"或"derived"两个字面值之一（直接事实填"direct"，有前提的推论填"derived"并填写rationale；"fact"不是合法的kind取值）；text最多160字符；每条证据仅chunk_id和精确quote，不能编造页码或偏移。无法获得支持的部分进入missing_evidence，不使用编造引用补齐。
+输出严格ContentProposal JSON。claims使用ClaimProposal：kind只能是"direct"或"derived"两个字面值之一（直接事实填"direct"，有前提的推论填"derived"并填写rationale；"fact"不是合法的kind取值）；text最多160字符；每条证据仅chunk_id和quote，quote必须是该chunk文本的逐字连续子串——逐字符一致，不得改写、翻译、拼接或省略标点，不能编造页码或偏移。你计划写入的某条内容在片段中找不到支持时才进入missing_evidence；资料已明确声明不覆盖的边界（如"本课不涉及具体器件参数"）而你也没有写该类内容，不是缺口，不得上报——没有此类缺口就返回空数组；确需写入却没有支持时仍必须上报，不得为过核验门而隐瞒。不使用编造引用补齐。
 
 输出结构（字段名与嵌套必须一致，不增不减）：
 {"claims":[{"id":"c1","text":"…","kind":"direct","evidence_refs":[{"chunk_id":"…","quote":"…"}],"rationale":null}],
