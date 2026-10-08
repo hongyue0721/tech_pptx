@@ -1,5 +1,7 @@
 # process｜当前工程事实与交接
 
+2026-10-07 仓库布局整理：原 `Courseware_Copilot_Demo_工程规划与数据_v1/Courseware_Copilot_Demo_Plan_v1/` 的项目内容已提升到仓库根目录；重复安装的 Skill 合并到根目录 `.codeartsdoer/skills/teacher-courseware/`，`.cc_demo/` 和 `.playwright-mcp/` 原位保留并忽略。迁移后实际执行：后端 703 passed、前端构建通过、`tools/validate_pack.py` 23/23、根目录 CLI doctor、开发 API `/api/v1/health`、PDF 抽取和 12/12 引文片段探针通过。未调用外部模型；本条不改变以下历史任务的验收状态。
+
 版本：1.0.30；日期：2026-09-22；阶段：**M3 / T10 DONE（L3 负责人实测 PASS，d960783），T13 Skill+CLI 完成（判 PARTIAL：新会话自动发现待验，见 T13 段）**；远端 97fe9ef，本地领先 13+。
 
 ## 当前事实

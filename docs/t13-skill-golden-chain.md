@@ -57,9 +57,9 @@ blocked 候选不可 commit；为演示下游链（edit/restore/export），
 
 ## Skill 发现性（如实区分）
 
-- Skill 已安装两处：规划包 `.codeartsdoer/skills/teacher-courseware/`
-  （allowed_paths 内，随仓库发布）与工作区 `.codeartsdoer/skills/`
-  （码道发现目录）。
+- 2026-09-22 实测时 Skill 分别位于规划包与工作区的
+  `.codeartsdoer/skills/teacher-courseware/`，内容相同；仓库根目录整理后
+  合并为根目录这一处，随仓库分发，同时作为码道发现目录。
 - 本会话 listSkills 未列出该 Skill：码道 Skill 发现为会话启动时快照，
   会话中途安装不进入当前清单。**"码道 Agent 按 SKILL.md+references
   工作流真实执行"已达成（本记录即执行结果）**；"新会话自动发现/

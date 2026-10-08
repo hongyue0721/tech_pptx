@@ -1,11 +1,10 @@
 """T02 探针对账：将本次抽取与包内 reference_chunks.json（pypdf-demo-nfc-v1 产物）比对。"""
 import json
-import sys
+from pathlib import Path
 
-sys.path.insert(0, "/home/hongyue/.cache/uv/archive-v0/eLs9Ods-FqgczIHp")
 from pypdf import PdfReader
 
-BASE = "/home/hongyue/Projects/ppt_edit/Courseware_Copilot_Demo_工程规划与数据_v1/Courseware_Copilot_Demo_Plan_v1"
+BASE = Path(__file__).resolve().parents[2]
 notes = PdfReader(f"{BASE}/demo-data/inputs/01_stm32_interrupt_notes.pdf")
 cases = PdfReader(f"{BASE}/demo-data/inputs/02_priority_casebook.pdf")
 page_text = {

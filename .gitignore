@@ -1,2 +1,15 @@
+.env
+.env.*
+!.env.example
+data/
+private-evidence/
+node_modules/
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+frontend/dist/
+*.log
+.DS_Store
 .cc_demo/
 .playwright-mcp/

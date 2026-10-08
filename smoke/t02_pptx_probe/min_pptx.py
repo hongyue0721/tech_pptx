@@ -3,8 +3,9 @@ PPTX = OOXML 的 ZIP 包。手工构造 PresentationML，验证我们理解其�
 后续无论选 ppt-edit 还是 PptxGenJS，此文件用于目标 Office 的可编辑性验收。
 """
 import zipfile
+from pathlib import Path
 
-OUTPUT = "/home/hongyue/Projects/ppt_edit/smoke/t02_pptx_probe/minimal_probe.pptx"
+OUTPUT = Path(__file__).with_name("minimal_probe.pptx")
 
 CONTENT_TYPES = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">

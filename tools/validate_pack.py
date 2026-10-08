@@ -21,10 +21,11 @@ def load(rel):return json.loads((ROOT/rel).read_text(encoding='utf-8'))
 def sha(b):return hashlib.sha256(b).hexdigest()
 def norm(t):return unicodedata.normalize('NFC',t.replace('\r\n','\n').replace('\r','\n').replace('\0','')).strip()
 def distribution_files():
- # PACK静态校验的对象是将被分发的内容（git跟踪+未跟踪非ignore），不是本机运行时环境（node_modules/.venv等被gitignore排除）
+ # 只检查当前存在的分发文件；目录迁移尚未暂存时，Git 索引仍列出旧路径。
+ # gitignore 排除 node_modules/.venv 等本机运行环境。
  out=subprocess.run(['git','ls-files','--cached','--others','--exclude-standard'],cwd=ROOT,capture_output=True,text=True)
  expect(out.returncode==0,'git repository required for distribution view: '+out.stderr.strip())
- return [ROOT/l for l in out.stdout.splitlines() if l]
+ return [ROOT/l for l in out.stdout.splitlines() if l and (ROOT/l).is_file()]
 def distribution_md_files():
  return [p for p in distribution_files() if p.suffix.lower()=='.md']
 

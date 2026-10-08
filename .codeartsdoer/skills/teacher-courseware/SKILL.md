@@ -10,8 +10,8 @@ description: Prepare and revise source-grounded teaching slides from teacher-pro
 The project CLI is implemented and smoke-tested:
 
 ```
-PYTHONPATH=<repo>/Courseware_Copilot_Demo_工程规划与数据_v1/Courseware_Copilot_Demo_Plan_v1/backend/src \
-<repo>/.../backend/.venv/bin/python -m courseware_core.cli <command> ...
+PYTHONPATH=<repo>/backend/src \
+<repo>/backend/.venv/bin/python -m courseware_core.cli <command> ...
 ```
 
 Every command prints exactly one JSON envelope to stdout:

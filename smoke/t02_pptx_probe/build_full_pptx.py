@@ -1,8 +1,9 @@
 """T02 修复版：完整 OOXML 结构（slideMaster + slideLayout + theme + slide 全链）。
 python-pptx 生成的最简文件也是这套骨架，PowerPoint/WPS 实测兼容。"""
 import zipfile
+from pathlib import Path
 
-OUT = "/home/hongyue/Projects/ppt_edit/Courseware_Copilot_Demo_工程规划与数据_v1/Courseware_Copilot_Demo_Plan_v1/smoke/t02_pptx_probe/minimal_probe_v2.pptx"
+OUT = Path(__file__).with_name("minimal_probe_v2.pptx")
 
 CONTENT_TYPES = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">

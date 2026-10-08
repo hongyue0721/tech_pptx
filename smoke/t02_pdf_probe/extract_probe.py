@@ -1,12 +1,11 @@
 """T02 pypdf 中文抽取探针：对包内正例讲义做逐物理页文本抽取并输出质量报告。"""
 import json
-import sys
 import hashlib
+from pathlib import Path
 
-sys.path.insert(0, "/home/hongyue/.cache/uv/archive-v0/eLs9Ods-FqgczIHp")
 from pypdf import PdfReader
 
-PDF = "/home/hongyue/Projects/ppt_edit/Courseware_Copilot_Demo_工程规划与数据_v1/Courseware_Copilot_Demo_Plan_v1/demo-data/inputs/01_stm32_interrupt_notes.pdf"
+PDF = Path(__file__).resolve().parents[2] / "demo-data/inputs/01_stm32_interrupt_notes.pdf"
 
 reader = PdfReader(PDF)
 pages = len(reader.pages)

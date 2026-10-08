@@ -1,18 +1,16 @@
-# Courseware Copilot · Demo 工程规划包
+# Courseware Copilot · 教师课件助手
 
-**版本：1.0.0 · 2026-09-18 · 面向单人主开发、AI辅助施工。**
+本仓库根目录即项目根目录。教师提供课题、教学要求和可提取文本的 PDF，确认大纲后生成有来源的课件；局部修改须审阅确认，正式版本可导出可编辑 PPTX。
 
-定位：教师给出课题、教学要求和可提取文本的PDF材料，先确认大纲，再生成有来源的课件，通过自然语言提出局部修改，审阅变更后导出可编辑PPTX。
-
-本包交付的是**规格、契约、任务卡、Skill模板、可上传演示数据和规划包静态检查工具**。工程已按任务卡推进：T00–T08 闭环（骨架、任务/幂等/版本层、PDF 导入、检索/证据、模型 Adapter、大纲生成与教师确认均已实现并有测试覆盖，pytest 421 全绿）；但**完整产品链路（生成/渲染/导出/前端全流程）尚未接通，未公网部署**——不要把已实现的后端阶段宣传成可用的线上应用，也不要把规划示例、参考DeckSpec或静态自检报告宣传成线上实测。
+项目包含 Vue 前端、FastAPI 后端与共享业务核心、CodeArts Skill、接口契约、自编演示数据和规划文档。PDF 导入、候选生成与审核、版本化编辑和导出均已实现；真实模型需要单独配置和授权，完整上线验收与公网部署不能由离线测试代替。历史进度与已知未验项见 `process.md`、`tasks/tasks.json`。
 
 ## 从哪里开始
 
-负责人：先读 `docs/00-owner-guide.md`，再读 `docs/01-prd.md` 和 `docs/14-milestones-and-demo.md`。
+负责人：先读 `docs/00-owner-guide.md`、`docs/01-prd.md` 和 `docs/14-milestones-and-demo.md`。施工按 `AGENTS.md`、`process.md`、`api.md` 和相关契约执行；`prompts/00-start-here.md` 是最初规划阶段的历史起点，不是当前施工进度。
 
-施工AI：先读 `AGENTS.md`、`process.md`，按当前任务读取 `docs/02-architecture.md`、`api.md`、相应契约。首次指令在 `prompts/00-start-here.md`，**第一轮只做M0准入验证，不一口气写完应用**。
+从仓库根目录运行后端测试：`cd backend && .venv/bin/python -m pytest tests`；开发 API：`cd backend && PYTHONPATH=src .venv/bin/python -m courseware_api.dev`；前端：`cd frontend && npm run dev`。模型配置参考 `.env.example`，开发入口读取 `APP_DB_PATH`、`APP_PORT`；密钥不进仓库。
 
-连续阅读：打开本目录 `阅读版.html`，无需联网。上传演示材料：使用 `demo-data/inputs/`；验收答案和参考产物在 `demo-data/expected/`，禁止产品运行时自动读取它们。
+连续阅读可打开 `阅读版.html`；演示 PDF 在 `demo-data/inputs/`，参考答案在 `demo-data/expected/`，产品运行时禁止读取参考答案。本机 `.cc_demo/` 与 `.playwright-mcp/` 是被忽略的运行记录，不属于源码。
 
 ## 已冻结的范围
 
@@ -47,4 +45,4 @@ Vue 3 + TypeScript + Vite + AnyUI；FastAPI + SQLite + 单实例后台工作器�
 
 ## 重建与校验
 
-运行 `python tools/validate_pack.py` 检查包内契约和数据；`python tools/build_reader.py` 重建阅读版。演示PDF原稿和构建工具也随包提供。完整文件列表见manifest.txt，交付快照校验和见SHA256SUMS.txt；重新生成报告/PDF后相关hash自然会变化，不再代表原始交付快照。
+运行 `.venv/bin/python tools/validate_pack.py` 检查包内契约和数据（首次安装工具依赖见 `tools/README.md`）；`python tools/build_reader.py` 重建阅读版。`manifest.txt` 与 `SHA256SUMS.txt` 保存最初规划包交付快照，不代表整理后的当前文件清单或校验和。
